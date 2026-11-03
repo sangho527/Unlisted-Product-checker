@@ -225,5 +225,28 @@ class App(tk.Tk):
             pass
 
 
+def selftest(fixture_dir, out_dir):
+    """화면 없이 점검을 끝까지 실행 (빌드 확인용): MusinsaChecker.exe --selftest <입력폴더> <결과폴더>"""
+    os.makedirs(out_dir, exist_ok=True)
+    logf = open(os.path.join(out_dir, 'selftest.log'), 'w', encoding='utf-8')
+    log = lambda m: (logf.write(m + '\n'), logf.flush())
+    try:
+        f = lambda n: os.path.join(fixture_dir, n)
+        files = {'sellmate': f('sellmate_stock.csv'), 'musinsa_all': f('musinsa_products_all.xlsx'),
+                 'musinsa_selling': f('musinsa_products_selling.xlsx'), 'musinsa_option': f('musinsa_option_stock.xlsx'),
+                 'search': f('search_brand.txt')}
+        outs = runner.run_check(files, out_dir, log=log)
+        ok = sum(o.endswith('.xlsx') for o in outs) == 2
+        log('SELFTEST ' + ('OK' if ok else 'FAIL'))
+        return 0 if ok else 1
+    except Exception:
+        log(traceback.format_exc()); log('SELFTEST FAIL')
+        return 1
+    finally:
+        logf.close()
+
+
 if __name__ == '__main__':
+    if len(sys.argv) >= 4 and sys.argv[1] == '--selftest':
+        sys.exit(selftest(sys.argv[2], sys.argv[3]))
     App().mainloop()

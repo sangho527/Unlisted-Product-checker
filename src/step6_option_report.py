@@ -7,8 +7,8 @@ r=pd.read_pickle(cfg.WORK+'judged.pkl'); miss=pd.read_pickle(cfg.WORK+'optmiss.p
 import re
 OTHER=cfg.EXCLUDE_CODE_PATTERN   # 다른 브랜드 제외 (config.py)
 def other_brand(code): return bool(re.match(OTHER,str(code).strip().upper()))
-r=r[~r['스타일넘버'].map(other_brand)&~r['셀메이트상품코드'].map(lambda c: isinstance(c,str) and other_brand(c))].copy()
-miss=miss[~miss['상품코드'].map(other_brand)&~miss['무신사스타일넘버'].map(other_brand)].copy()
+r=r[~r['스타일넘버'].map(other_brand).astype(bool)&~r['셀메이트상품코드'].map(lambda c: isinstance(c,str) and other_brand(c)).astype(bool)].copy()
+miss=miss[~miss['상품코드'].map(other_brand).astype(bool)&~miss['무신사스타일넘버'].map(other_brand).astype(bool)].copy()
 PROB=['무신사 품절(셀메이트 재고 있음)','판매 제한(재고 입력됐는데 판매가능 0)']
 ORDER=PROB+['품절(다른 상품번호에서는 판매중)','품절(같은 상품 안 다른 옵션명으로 판매중)','초과판매 위험(셀메이트 재고 없음)','확인필요(옵션 매칭 안 됨)','정상 판매','정상 판매(무신사 풀필먼트 출고)','정상 품절(양쪽 재고 없음)','대조 제외(세트상품)']
 OTH=ORDER[2:4]; OVR_RISK='초과판매 위험(셀메이트 재고 없음)'; CHK='확인필요(옵션 매칭 안 됨)'
@@ -17,7 +17,7 @@ r['_o']=r['판정'].map({k:i for i,k in enumerate(ORDER)})
 r['링크']='https://www.musinsa.com/products/'+r['상품번호'].astype(str)
 r['무신사배송재고']=r['국내출고/무신사배송']+r['일본출고/무신사배송']
 R=pd.read_pickle(cfg.WORK+'namechk.pkl'); flag=R[R['대조결과'].str.startswith('확인')].set_index('무신사상품번호')['대조결과']
-r['상품명대조']=r['상품번호'].map(flag).fillna('')
+r['상품명대조']=r['상품번호'].map(flag).astype(object).fillna('')
 r=r.sort_values(['_o','셀메이트재고','상품번호'],ascending=[True,False,True])
 F='Arial'; H=PatternFill('solid',fgColor='1F3864'); HF=Font(name=F,bold=True,color='FFFFFF',size=10)
 wb=Workbook(); ws0=wb.active; ws0.title='요약'
@@ -163,9 +163,9 @@ h3=['셀메이트 옵션코드','셀메이트 상품명','셀메이트 옵션명
 sheet('무신사에_옵션없음',mi,c3,h3,[26,40,16,9,9,11,38,38],desc='[왜 만들었나] 셀메이트에는 재고가 있는 옵션인데, 연결된 무신사 상품에 그 옵션(컬러·사이즈) 자체가 없어서 고객이 고를 수 없는 경우를 찾기 위한 시트입니다. 품절이 아니라 옵션 누락이라 옵션별_점검에는 나오지 않습니다.\n[읽는 법] 셀메이트 재고 많은 순. 무신사 상품에 옵션을 추가할지 확인하세요.')
 # 6) 상품명 대조 (무신사 판매중 → 셀메이트)
 R=pd.read_pickle(cfg.WORK+'namechk.pkl')
-R=R[~R['무신사스타일넘버'].map(other_brand)&~R['대조결과'].str.startswith('정상')].copy()   # 정상 일치 상품은 기록하지 않음
+R=R[~R['무신사스타일넘버'].map(other_brand).astype(bool)&~R['대조결과'].str.startswith('정상')].copy()   # 정상 일치 상품은 기록하지 않음
 NOTE=cfg.LISTING_NOTES
-R['메모']=R['무신사상품번호'].map(NOTE).fillna('')
+R['메모']=R['무신사상품번호'].map(NOTE).astype(object).fillna('')
 R['_k']=R['대조결과'].map(lambda v: 0 if v.startswith('확인') else (1 if v.startswith('셀메이트에서') else (3 if v.startswith('세트') else 2)))
 R['무신사재고']=pd.to_numeric(R['무신사재고'].astype(str).str.replace(',',''),errors='coerce')
 R=R.sort_values(['_k','대조결과','무신사재고'],ascending=[True,True,False])

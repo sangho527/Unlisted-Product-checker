@@ -134,7 +134,7 @@ for _,r in g.iterrows():
                      다른매칭상태='참고: 다른 컬러 상태 '+o['무신사'],무신사링크=f"https://www.musinsa.com/products/{o['상품 번호']}")
         res.append(d)
 out=pd.concat([g.reset_index(drop=True),pd.DataFrame(res)],axis=1)
-act=(out['판매여부']=='판매')&(out['재고합계']>0)
+act=(out['재고합계']>0)   # 셀메이트 판매여부(판매/이월)와 상관없이 재고가 있으면 조치 대상
 out['조치필요']=np.select([act&out['판정'].eq('미등록'),act&out['무신사상태'].eq('품절'),act&out['판정'].eq('등록·미노출')],
   ['미등록(재고있음)','무신사 품절표시(재고있음)','판매중지 등(재고있음)'],'')
 m['셀메이트매칭']=m.index.isin(used)

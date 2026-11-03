@@ -14,7 +14,7 @@ def clean(n):
         if re.fullmatch(r'[A-Z][A-Z0-9*]*',core) and core not in NOTCOL and (mixed or core in EN): t.pop(); continue
         break
     return re.sub(r'[_]+',' ',' '.join(t)).strip(' -_')
-d=pd.read_excel(cfg.OUT+f'무신사_옵션재고점검_{cfg.TODAY}.xlsx','상품별_한눈에보기',dtype=str)
+d=pd.read_excel(cfg.OUT+f'무신사_옵션재고점검_{cfg.TODAY}.xlsx','상품별_한눈에보기',dtype=str,header=1)
 d['검색어']=d['무신사 상품명'].map(clean)
 d[['무신사 상품번호','무신사 상품명','검색어']].to_pickle(cfg.WORK+'kw.pkl')
 json.dump([[a,b] for a,b in zip(d['무신사 상품번호'],d['검색어'])],open(cfg.WORK+'kw.json','w',encoding='utf-8'),ensure_ascii=False)

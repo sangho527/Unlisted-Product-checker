@@ -27,9 +27,15 @@ def need(path, label):
         sys.exit(f'[입력 파일 없음] {label}: {path}\n  README의 "준비할 파일"을 확인하세요.')
 
 need(cfg.SELLMATE_STOCK, '셀메이트 재고목록')
-need(cfg.MUSINSA_ALL, '무신사 상품정보조회(전체)')
-steps = STEPS[:2] if '--listing' in sys.argv else STEPS
-if steps is STEPS:
+if '--listing' in sys.argv:
+    need(cfg.MUSINSA_ALL, '무신사 상품정보조회(전체)')
+    steps = STEPS[:2]
+elif os.path.exists(cfg.MUSINSA_ALL):
+    steps = STEPS
+else:
+    print('상품정보조회(전체) 파일이 없어 등록 현황 엑셀은 건너뜁니다.')
+    steps = STEPS[2:]
+if '--listing' not in sys.argv:
     need(cfg.MUSINSA_SELLING, '무신사 상품정보조회(판매중)')
     need(cfg.MUSINSA_OPTION, '무신사 재고관리 옵션 목록')
 
@@ -40,6 +46,6 @@ for f, label in steps:
     print(f'{time.time()-t:.0f}s')
 
 print('\n완료 →', cfg.OUT)
-if not os.path.exists(cfg.SEARCH_RESULT) and steps is STEPS:
+if not os.path.exists(cfg.SEARCH_RESULT) and '--listing' not in sys.argv:
     print('※ 무신사 검색 노출 확인: output/musinsa_brand_search_ready.js 를 무신사 페이지 콘솔에서 실행 → '
           '결과를 data/search_brand.txt 로 저장 → run_all.py 다시 실행')

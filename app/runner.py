@@ -73,20 +73,29 @@ def _check(path, label):
 
 def run_check(files, out_dir, listing_only=False, log=_console):
     _check(files.get('sellmate'), '셀메이트 재고목록')
-    _check(files.get('musinsa_all'), '무신사 상품정보조회(전체)')
-    if not listing_only:
+    has_all = bool(files.get('musinsa_all')) and os.path.exists(files['musinsa_all'])
+    if listing_only:
+        _check(files.get('musinsa_all'), '무신사 상품정보조회(전체)')
+    else:
         _check(files.get('musinsa_selling'), '무신사 상품정보조회(판매중)')
         _check(files.get('musinsa_option'), '무신사 재고관리 옵션 목록')
     cfg.load_settings()
     cfg.set_output(out_dir)
     cfg.SELLMATE_STOCK = files['sellmate']
-    cfg.MUSINSA_ALL = files['musinsa_all']
+    cfg.MUSINSA_ALL = files.get('musinsa_all') or ''
     cfg.MUSINSA_SELLING = files.get('musinsa_selling') or ''
     cfg.MUSINSA_OPTION = files.get('musinsa_option') or ''
     search = files.get('search')
     cfg.SEARCH_RESULT = search if search and os.path.exists(search) else os.path.join(cfg.WORK, '__no_search__.txt')
     log(f'브랜드: {cfg.BRAND_KR} / 결과 폴더: {out_dir}')
-    _run_steps(LISTING_STEPS if listing_only else LISTING_STEPS + OPTION_STEPS, log)
+    if listing_only:
+        steps = LISTING_STEPS
+    elif has_all:
+        steps = LISTING_STEPS + OPTION_STEPS
+    else:
+        log('상품정보조회(전체) 파일이 없어 등록 현황 엑셀(미등록·판매중지)은 건너뜁니다.')
+        steps = OPTION_STEPS
+    _run_steps(steps, log)
     if not listing_only and search and os.path.exists(search):
         log('검색 결과 반영해서 엑셀 다시 작성 ...')
         _run_steps([('step6_option_report.py', '    옵션 재고 점검 엑셀')], log)
@@ -117,12 +126,12 @@ def outputs(out_dir):
 
 
 def main():
-    """명령줄: python app/runner.py 셀메이트.csv 무신사전체.xlsx 무신사판매중.xlsx 옵션목록.xlsx [결과폴더] [검색결과.txt]"""
+    """명령줄: python app/runner.py 셀메이트.csv 무신사전체.xlsx(없으면 -) 무신사판매중.xlsx 옵션목록.xlsx [결과폴더] [검색결과.txt]"""
     a = sys.argv[1:]
     if len(a) < 4:
         print(main.__doc__); sys.exit(1)
     out = os.path.abspath(a[4]) if len(a) > 4 else os.path.join(cfg.ROOT, 'output')
-    files = dict(zip(['sellmate', 'musinsa_all', 'musinsa_selling', 'musinsa_option'], map(os.path.abspath, a[:4])))
+    files = dict(zip(['sellmate', 'musinsa_all', 'musinsa_selling', 'musinsa_option'], [os.path.abspath(p) if p != '-' else '' for p in a[:4]]))
     if len(a) > 5:
         files['search'] = os.path.abspath(a[5])
     try:

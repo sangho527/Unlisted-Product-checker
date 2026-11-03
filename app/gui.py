@@ -17,9 +17,9 @@ LAST_FILE = os.path.join(cfg.ROOT, 'last_paths.json')
 
 INPUTS = [
     ('sellmate',        '셀메이트 재고목록 (.csv)',         '셀메이트 → 재고 목록 → 엑셀 다운로드 (stk_stockList_*.csv)', [('CSV', '*.csv'), ('모든 파일', '*.*')]),
-    ('musinsa_all',     '무신사 상품정보조회 – 전체 (.xlsx)', '파트너센터 → 상품정보조회 → 상품상태 "전체" → 엑셀 다운로드',   [('Excel', '*.xlsx'), ('모든 파일', '*.*')]),
-    ('musinsa_selling', '무신사 상품정보조회 – 판매중 (.xlsx)', '같은 화면에서 상품상태 "판매중" → 엑셀 다운로드',            [('Excel', '*.xlsx'), ('모든 파일', '*.*')]),
+    ('musinsa_selling', '무신사 상품정보조회 – 판매중 (.xlsx)', '파트너센터 → 상품정보조회 → 상품상태 "판매중" → 엑셀 다운로드',  [('Excel', '*.xlsx'), ('모든 파일', '*.*')]),
     ('musinsa_option',  '무신사 재고관리(v2) 옵션 목록 (.xlsx)', '재고 관리(v2) → 판매중·출력수 5000 → 표 전체 복사 → 엑셀에 붙여넣어 저장', [('Excel', '*.xlsx'), ('모든 파일', '*.*')]),
+    ('musinsa_all',     '(선택) 무신사 상품정보조회 – 전체 (.xlsx)', '넣으면 미등록·판매중지 상품을 찾는 등록 현황 엑셀도 만듭니다. 판매중 상품 점검만 할 때는 비워두세요', [('Excel', '*.xlsx'), ('모든 파일', '*.*')]),
 ]
 
 
@@ -75,7 +75,7 @@ class App(tk.Tk):
         rb = ttk.Frame(self); rb.pack(fill='x', **pad)
         self.run_btn = ttk.Button(rb, text='▶  점검 시작', command=self.start)
         self.run_btn.pack(side='left', ipadx=20, ipady=6)
-        ttk.Checkbutton(rb, text='등록 현황만 (셀메이트 + 상품정보조회 전체 파일만 필요)', variable=self.listing_only).pack(side='left', padx=12)
+        ttk.Checkbutton(rb, text='등록 현황만 (셀메이트 + 상품정보조회 전체 파일로 미등록·판매중지만 확인)', variable=self.listing_only).pack(side='left', padx=12)
         self.pb = ttk.Progressbar(rb, mode='indeterminate', length=160); self.pb.pack(side='right')
 
         sb = ttk.LabelFrame(self, text=' 3. (선택) 무신사 검색 노출 확인 — 점검을 먼저 실행한 뒤 '); sb.pack(fill='x', **pad)
@@ -88,7 +88,7 @@ class App(tk.Tk):
         lb = ttk.LabelFrame(self, text=' 진행 상황 '); lb.pack(fill='both', expand=True, **pad)
         self.log_box = ScrolledText(lb, height=12, font=('Consolas', 9), state='disabled')
         self.log_box.pack(fill='both', expand=True, padx=6, pady=6)
-        self.log('입력 파일 4개를 고르고 [점검 시작]을 누르세요. 결과 엑셀은 결과 저장 폴더에 만들어집니다.')
+        self.log('입력 파일 3개(셀메이트·판매중·옵션 목록)를 고르고 [점검 시작]을 누르세요. 결과 엑셀은 결과 저장 폴더에 만들어집니다.')
 
     # ---------- 동작 ----------
     def pick(self, key, types):
@@ -198,10 +198,9 @@ class App(tk.Tk):
 
     def show_help(self):
         messagebox.showinfo(APP_TITLE, (
-            '1) 입력 파일 4개를 고릅니다.\n'
-            '2) [점검 시작] → 결과 폴더에 엑셀 2개가 만들어집니다.\n'
-            '   · 무신사_옵션재고점검_날짜.xlsx  ← 메인 (상품별_한눈에보기부터 보세요)\n'
-            '   · 무신사_어반드레스_등록점검_날짜.xlsx\n'
+            '1) 입력 파일 3개(셀메이트 재고목록, 상품정보조회 판매중, 재고관리 옵션 목록)를 고릅니다.\n'
+            '2) [점검 시작] → 결과 폴더에 무신사_옵션재고점검_날짜.xlsx 가 만들어집니다 (상품별_한눈에보기부터 보세요).\n'
+            '   (선택) 상품정보조회 전체 파일도 넣으면 미등록·판매중지를 찾는 등록점검 엑셀이 추가됩니다.\n'
             '3) (선택) 검색 노출 확인: ① 버튼 → 무신사 콘솔에 붙여넣기 → 끝나면 ② 버튼\n\n'
             '각 시트 맨 위에 "왜 만들었나 / 읽는 법"이 적혀 있습니다.\n'
             '재고·원가가 들어 있는 파일이니 외부에 공유하지 마세요.'))
@@ -237,6 +236,12 @@ def selftest(fixture_dir, out_dir):
                  'search': f('search_brand.txt')}
         outs = runner.run_check(files, out_dir, log=log)
         ok = sum(o.endswith('.xlsx') for o in outs) == 2
+        # 전체 파일 없이도 도는지 확인
+        files['musinsa_all'] = ''
+        out2 = os.path.join(out_dir, 'without_all')
+        os.makedirs(out2, exist_ok=True)
+        outs2 = runner.run_check(files, out2, log=log)
+        ok = ok and sum(o.endswith('.xlsx') for o in outs2) == 1
         log('SELFTEST ' + ('OK' if ok else 'FAIL'))
         return 0 if ok else 1
     except Exception:

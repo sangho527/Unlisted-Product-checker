@@ -16,7 +16,7 @@
 개발 환경 없이 쓰려면 **MusinsaChecker.exe**를 받으세요.
 
 1. GitHub → **Actions** → `Build Windows exe` → 최신 실행 → 하단 **Artifacts**의 `MusinsaChecker-windows` 다운로드 (또는 Releases에 올라간 zip)
-2. 압축을 풀고 `MusinsaChecker.exe` 실행 → 파일 4개 선택 → **[점검 시작]**
+2. 압축을 풀고 `MusinsaChecker.exe` 실행 → 파일 3개(셀메이트·판매중·옵션 목록) 선택 → **[점검 시작]**
 3. 자세한 사용법은 zip 안의 `사용법.txt` ([docs/사용법.txt](docs/사용법.txt))
 
 처음 실행할 때 Windows 보호 화면이 뜨면 "추가 정보 → 실행"을 누르세요 (서명되지 않은 exe라서 뜨는 안내입니다).
@@ -61,9 +61,9 @@ exe 빌드: `main`에 `app/`, `src/`, `search/`, `config.py`가 바뀌어 push�
 | 파일명 | 어디서 받나 | 비고 |
 |---|---|---|
 | `sellmate_stock.csv` | 셀메이트 → 재고 목록 엑셀 다운로드 (`stk_stockList_*.csv`) | 필수. cp949 인코딩 그대로 |
-| `musinsa_products_all.xlsx` | 무신사 파트너센터 → 상품정보조회 → 상품상태 **전체** → 엑셀 다운로드 | 필수. 품절·판매중지·삭제 상태 확인용 |
-| `musinsa_products_selling.xlsx` | 같은 화면, 상품상태 **판매중** → 엑셀 다운로드 | 옵션 점검 시 필수 |
-| `musinsa_option_stock.xlsx` | 무신사 파트너센터 → 상품/재고 → **재고 관리(v2)** → 상품상태 판매중, 출력수 5000 → 표 전체 복사 → 엑셀에 붙여넣어 저장 | 옵션 점검 시 필수. 엑셀 다운로드 버튼이 없어 복사로 만듭니다. 5000건이 넘으면 2페이지도 이어 붙이기 |
+| `musinsa_products_all.xlsx` | 무신사 파트너센터 → 상품정보조회 → 상품상태 **전체** → 엑셀 다운로드 | **선택.** 넣으면 미등록·판매중지 상품을 찾는 등록점검 엑셀도 만듦. 판매중 상품의 옵션 품절·검색 노출 점검에는 필요 없음 |
+| `musinsa_products_selling.xlsx` | 무신사 파트너센터 → 상품정보조회 → 상품상태 **판매중** → 엑셀 다운로드 | 필수 |
+| `musinsa_option_stock.xlsx` | 무신사 파트너센터 → 상품/재고 → **재고 관리(v2)** → 상품상태 판매중, 출력수 5000 → 표 전체 복사 → 엑셀에 붙여넣어 저장 | 필수. 엑셀 다운로드 버튼이 없어 복사로 만듭니다. 5000건이 넘으면 2페이지도 이어 붙이기 |
 | `search_brand.txt` | 아래 "무신사 검색 노출 확인" 결과 | 선택 |
 
 재고 관리(v2) 복사본은 첫 줄이 `매장명, 업체, 품목, 브랜드, 스타일넘버, 상품번호, 상품명, 상태, 옵션, 옵션번호, 국내출고/브랜드배송, 국내출고/무신사배송, 일본출고/무신사배송, 총합 판매가능` 헤더여야 합니다.
@@ -74,7 +74,7 @@ exe 빌드: `main`에 `app/`, `src/`, `search/`, `config.py`가 바뀌어 push�
 
 ```bash
 pip install -r requirements.txt
-python run_all.py              # 전체 (등록 현황 + 옵션 재고 점검)
+python run_all.py              # 옵션 재고 점검 (+ musinsa_products_all.xlsx가 있으면 등록 현황도)
 python run_all.py --listing    # 등록 현황만 (musinsa_products_all.xlsx + 셀메이트만 있으면 됨)
 ```
 

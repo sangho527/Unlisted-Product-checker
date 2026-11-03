@@ -66,14 +66,4 @@ grp=R[~R['대조결과'].str.startswith('세트')].groupby('_b')['비교용상�
 multi=set(grp[grp>1].index)
 R['같은스타일_다른이름_무신사상품']=R['_b'].isin(multi)
 R.to_pickle(cfg.WORK+'namechk.pkl')
-# 셀메이트 쪽 누락: 재고 있는 판매 상품 중 무신사 판매중 상품과 스타일넘버·상품명 어느 쪽으로도 연결 안 됨
-linked=set()
-for x in R['스타일넘버연결_셀메이트'].tolist()+R['상품명일치_셀메이트'].tolist():
-    linked|=set(t for t in x.split(', ') if t)
-Q=P[P['어반드레스']&~P['상품코드'].isin(linked)&(P['재고']>0)&(P['판매여부']=='판매')].copy()
-# 이전 점검(전체 상태 파일)에서의 무신사 상태 참고
-old=pd.read_pickle(cfg.WORK+'out.pkl').set_index('상품코드')
-Q['전체파일_무신사상태']=Q['상품코드'].map(old['무신사상태']); Q['전체파일_무신사상품명']=Q['상품코드'].map(old['무신사상품명']); Q['전체파일_상품번호']=Q['상품코드'].map(old['무신사상품번호'])
-Q.to_pickle(cfg.WORK+'namechk_sel.pkl')
 print(R['대조결과'].value_counts()); print('multi-name styles',R['같은스타일_다른이름_무신사상품'].sum())
-print(len(Q), Q['재고'].sum()); print(Q['전체파일_무신사상태'].value_counts(dropna=False))

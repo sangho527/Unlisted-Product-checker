@@ -138,13 +138,20 @@ if HAS_SEARCH:
     from urllib.parse import quote
     S['검색링크']='https://www.musinsa.com/search/goods?keyword='+S['검색어'].map(lambda v: quote(str(v)))
     S['상품링크']='https://www.musinsa.com/products/'+S['상품번호']
+    def _note(row):
+        if row['검색여부']!='검색 안 됨': return ''
+        if '유니섹스' in str(row['검색어']):
+            return "무신사 웹 검색은 검색어에 '유니섹스'가 들어가면 결과 화면이 비어 보임(사이트 전체 현상, '유니섹스'만 검색해도 동일). '유니섹스'를 빼고 검색하면 노출됨 → 상품명에서 '유니섹스' 제외 검토"
+        return '검색 결과 화면에 해당 상품이 없음 → 무신사 상품 노출 상태 확인 필요'
+    S['비고']=S.apply(_note,axis=1)
     S['_k']=S['검색여부'].map(lambda v: 0 if v=='검색 안 됨' else (1 if v=='미확인' else 2))
     S=S.sort_values(['_k','순위'],ascending=[True,False])
-    c6=['검색여부','상품번호','상품명','검색어','검색결과수','브랜드결과수','순위','점검결과','검색링크','상품링크']
-    h6=['검색 결과','무신사 상품번호','무신사 상품명','검색어 (브랜드명 + 상품명, 컬러·COL 제외)','검색 결과 수',f'그중 {cfg.BRAND_KR} 상품 수','해당 상품 순위','옵션 점검결과','무신사 검색 링크','무신사 상품 링크']
+    c6=['검색여부','상품번호','상품명','검색어','검색결과수','브랜드결과수','순위','비고','점검결과','검색링크','상품링크']
+    h6=['검색 결과','무신사 상품번호','무신사 상품명','검색어 (브랜드명 + 상품명, 컬러·COL 제외)','검색 결과 수 (페이지 표시 총 N건)',f'화면에 보인 {cfg.BRAND_KR} 상품 수','화면 순위','비고','옵션 점검결과','무신사 검색 링크','무신사 상품 링크']
     D_S=(f'[왜 만들었나] 무신사에 정상 등록돼 있어도 고객이 검색했을 때 우리 브랜드 상품으로 나오지 않는 경우를 찾기 위한 시트입니다.\n'
-         f'[읽는 법] 무신사 검색(비로그인)에 "{cfg.BRAND_KR} + 상품명(컬러명·_3COL 등 컬러 묶음 표시 제외)"을 넣어, 결과에 해당 상품번호가 브랜드 "{cfg.BRAND_KR}"로 나오면 "검색됨". 순위는 해당 검색 결과 안에서의 위치입니다.')
-    ws=sheet('무신사_검색노출',S,c6,h6,[26,11,40,40,9,11,9,30,40,38],freeze='D3',desc=D_S)
+         f'[읽는 법] 무신사 검색(비로그인)에 "{cfg.BRAND_KR} + 상품명(컬러명·_3COL 등 컬러 묶음 표시 제외)"을 넣어, 실제 검색 결과 화면에 해당 상품번호가 브랜드 "{cfg.BRAND_KR}"로 나오면 "검색됨". 순위는 화면에서의 위치입니다. "검색 안 됨"은 비고에 원인을 적었습니다.')
+    ws=sheet('무신사_검색노출',S,c6,h6,[26,11,40,40,11,11,9,60,30,40,38],freeze='D3',desc=D_S)
+    for i in range(3,len(S)+3): ws.cell(i,8).alignment=Alignment(wrap_text=True,vertical='top')
     for i in range(3,len(S)+3):
         c=ws.cell(i,1); c.fill=PatternFill('solid',fgColor={'검색 안 됨':'F8CBAD','미확인':'E7E6E6'}.get(c.value,'C6EFCE'))
     wb.move_sheet('무신사_검색노출',offset=-(len(wb.sheetnames)-3))

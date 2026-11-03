@@ -13,17 +13,21 @@
  * 판정 기준
  *   - 검색어: "<BRAND> <상품명>"  (상품명은 컬러명·_3COL 같은 컬러 묶음 표시를 뗀 이름)
  *   - 해당 무신사 상품번호가 검색 결과에 있고, 그 상품의 브랜드명이 BRAND 일 때만 '검색됨'
- *   - 무신사 검색 화면이 쓰는 것과 같은 검색 API(api.musinsa.com/api2/dp/v1/plp/goods)를 호출합니다.
- *     페이지당 60개, 최대 5페이지(300개)까지 확인합니다.
+ *   - 고객이 보는 무신사 검색 결과 페이지(www.musinsa.com/search/goods)를 그대로 불러와,
+ *     화면에 표시되는 상품 목록(첫 페이지, 최대 60개)에서 상품번호·브랜드명을 확인합니다.
+ *     (검색 API 결과와 실제 화면이 다를 수 있어 화면 기준으로 확인합니다.
+ *      예: 검색어에 '유니섹스'가 들어가면 API에는 결과가 있어도 웹 화면은 '검색 결과가 없습니다'로 표시됨)
+ *   - 반드시 www.musinsa.com 페이지의 콘솔에서 실행하세요.
  *
  * 출력 형식 (한 줄에 한 상품)
- *   상품번호|검색결과수|순위(못 찾으면 빈칸)|검색결과 중 BRAND 상품 수
+ *   상품번호|검색결과수(페이지 제목의 '총 N건')|화면 순위(못 찾으면 빈칸)|화면에 보인 BRAND 상품 수
  */
 (async () => {
   const BRAND = "어반드레스";
   const KEYWORDS = [];            // [["무신사 상품번호", "검색어(브랜드명 제외)"], ...]  ← step5 가 채워줍니다
-  const MAX_PAGES = 5, SIZE = 60, DELAY_MS = 300;
+  const DELAY_MS = 400;
 
+  if (!/musinsa\.com$/.test(location.hostname)) { console.warn('www.musinsa.com 페이지에서 실행하세요.'); return; }
   if (!KEYWORDS.length) { console.warn('KEYWORDS 가 비어 있습니다. output/musinsa_brand_search_ready.js 를 사용하세요.'); return; }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const cache = {}, lines = [];
@@ -32,18 +36,13 @@
     const [goodsNo, name] = KEYWORDS[n];
     const kw = `${BRAND} ${name}`;
     if (!cache[kw]) {
-      let all = [], total = 0;
-      for (let page = 1; page <= MAX_PAGES; page++) {
-        const url = 'https://api.musinsa.com/api2/dp/v1/plp/goods?gf=A&keyword=' + encodeURIComponent(kw) +
-                    `&isUsed=false&page=${page}&size=${SIZE}&caller=SEARCH`;
-        const j = await fetch(url, { credentials: 'include' }).then((r) => r.json());
-        const d = j.data || {};
-        total = d.pagination ? d.pagination.totalCount : total;
-        all = all.concat((d.list || []).map((x) => ({ no: String(x.goodsNo), brand: x.brandName })));
-        if (!(d.pagination && d.pagination.hasNext)) break;
-        await sleep(DELAY_MS);
+      const html = await fetch('/search/goods?keyword=' + encodeURIComponent(kw) + '&gf=A').then((r) => r.text());
+      const seen = new Set(), all = [];
+      for (const m of html.matchAll(/\\?"goodsNo\\?":(\d+)[^{}]*?\\?"brandName\\?":\\?"([^"\\]+)/g)) {
+        if (!seen.has(m[1])) { seen.add(m[1]); all.push({ no: m[1], brand: m[2] }); }
       }
-      cache[kw] = { all, total };
+      const t = (html.match(/총 ([\d,]+)건/) || [])[1];
+      cache[kw] = { all, total: t ? Number(t.replace(/,/g, '')) : all.length };
       await sleep(DELAY_MS);
     }
     const c = cache[kw];
@@ -54,6 +53,7 @@
   }
 
   const text = lines.join('\n');
+  window.__musinsaSearchResult = text;
   try { await navigator.clipboard.writeText(text); console.log('결과를 클립보드에 복사했습니다 → data/search_brand.txt 로 저장하세요.'); }
   catch (e) { console.log('클립보드 복사 실패 — 아래 내용을 복사해 data/search_brand.txt 로 저장하세요.'); }
   const miss = lines.filter((l) => l.split('|')[2] === '');

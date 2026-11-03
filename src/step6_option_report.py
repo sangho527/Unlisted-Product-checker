@@ -181,7 +181,7 @@ ws['A1']=f'무신사 옵션 재고 점검 — {cfg.BRAND_KR} (판매중 상품, 
 ws['A3']=('[이 시트] 파일 전체 결과를 숫자로 모은 시트입니다. 다른 시트를 수식으로 집계해서 다른 시트를 고치면 숫자도 같이 바뀝니다. '
           '작업 순서: 상품별_한눈에보기 → 상품명_대조(스타일넘버 수정) → 무신사에_옵션없음.')
 ws['A3'].font=Font(name=F,size=10,color='1F3864')
-ws['A2']=f'기준: {cfg.fname(cfg.MUSINSA_OPTION)} × {cfg.fname(cfg.SELLMATE_STOCK)} × {cfg.fname(cfg.MUSINSA_SELLING)} · 작성 {cfg.TODAY}'; ws['A2'].font=Font(name=F,size=9,color='808080')
+ws['A2']=f'기준: '+(getattr(cfg,'SOURCE_LABEL',None) or f'{cfg.fname(cfg.MUSINSA_OPTION)} × {cfg.fname(cfg.SELLMATE_STOCK)} × {cfg.fname(cfg.MUSINSA_SELLING)}')+f' · 작성 {cfg.TODAY}'; ws['A2'].font=Font(name=F,size=9,color='808080')
 def hdr(row,titles):
     for j,t in enumerate(titles,1):
         x=ws.cell(row,j,t); x.font=HF; x.fill=H; x.alignment=Alignment(horizontal='center',wrap_text=True)
@@ -205,7 +205,7 @@ ws.cell(r1+1,1,'상품명 대조: 스타일넘버 확인 필요한 무신사 상
 ws.cell(r1+1,2,"=COUNTIFS('상품명_대조'!$A:$A,\"확인*\")")
 r2=r1+3
 if HAS_SEARCH:
-    hdr(r2,[f'무신사 검색 ("{cfg.BRAND_KR} + 상품명", 점검 필요 상품 대상)','상품 수'])
+    hdr(r2,[f'무신사 검색 ("{cfg.BRAND_KR} + 상품명", 이 파일의 점검 필요 상품)','상품 수'])
     for i,t in enumerate([f'검색됨 ({cfg.BRAND_KR} 브랜드 확인)','검색 안 됨','미확인'],r2+1):
         ws.cell(i,1,t).font=b; ws.cell(i,2,f"=COUNTIFS('무신사_검색노출'!$A:$A,$A{i})")
 r1=r1+6

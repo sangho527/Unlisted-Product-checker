@@ -2,7 +2,7 @@
  * 무신사 검색 노출 확인 스크립트 ("브랜드명 + 상품명" 검색)
  *
  * 사용법
- *   1) MusinsaChecker.exe 의 [① 상품 목록 만들기] (또는 python app/runner.py <재고관리_복사본.xlsx>)를 실행하면
+ *   1) MusinsaChecker.exe 의 [① 옵션 재고 점검 + 검색 준비] (또는 python app/runner.py <재고관리_복사본.xlsx>)를 실행하면
  *      결과 폴더에 musinsa_brand_search_ready.js 가 만들어집니다. (검색할 상품번호·검색어가 들어가 있음)
  *      exe 에서는 [② 검색 스크립트 복사 + 무신사 열기] 버튼이 이 내용을 복사해 줍니다.
  *   2) Chrome 에서 https://www.musinsa.com 을 열고 F12 → Console 탭을 엽니다. (로그인 필요 없음)
@@ -24,7 +24,7 @@
  */
 (async () => {
   const BRAND = "어반드레스";
-  const KEYWORDS = [];            // [["무신사 상품번호", "검색어(브랜드명 제외)"], ...]  ← exe [① 상품 목록 만들기]가 채워줍니다
+  const KEYWORDS = [];            // [["무신사 상품번호", "검색어(브랜드명 제외)"], ...]  ← exe [① 옵션 재고 점검 + 검색 준비]가 채워줍니다
   const DELAY_MS = 400;
 
   if (!/musinsa\.com$/.test(location.hostname)) { console.warn('www.musinsa.com 페이지에서 실행하세요.'); return; }

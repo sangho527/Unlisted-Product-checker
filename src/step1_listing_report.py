@@ -60,7 +60,7 @@ sheet('무신사에만_있는상품',mo,c2,[10,11,55,18,11,11,16,40],desc='[왜 
 # 요약 (formulas)
 D="'무신사_어반드레스_점검'"
 ws=ws0; b=Font(name=F,bold=True,size=10); n=Font(name=F,size=10)
-ws['A1']='무신사 등록 현황 점검 — 어반드레스'; ws['A1'].font=Font(name=F,bold=True,size=14)
+ws['A1']=f'무신사 등록 현황 점검 — {cfg.BRAND_KR}'; ws['A1'].font=Font(name=F,bold=True,size=14)
 ws['A3']='[이 시트] 무신사 등록 현황을 숫자로 모은 시트입니다. 다른 시트를 수식으로 집계합니다.'; ws['A3'].font=Font(name=F,size=10,color='1F3864')
 ws['A2']=f'기준: {cfg.fname(cfg.SELLMATE_STOCK)} × {cfg.fname(cfg.MUSINSA_ALL)} · 상품코드(컬러) 단위 · 작성 {cfg.TODAY}'; ws['A2'].font=Font(name=F,size=9,color='808080')
 r=4
@@ -103,4 +103,6 @@ for row in ws.iter_rows():
     for x in row:
         if x.font.name!=F: x.font=Font(name=F,size=10)
         if x.column>1 and isinstance(x.value,str) and x.value.startswith('='): x.number_format='#,##0'
+from openpyxl.workbook.properties import CalcProperties
+wb.calculation=CalcProperties(fullCalcOnLoad=True)
 wb.save(cfg.OUT+f'무신사_어반드레스_등록점검_{cfg.TODAY}.xlsx')

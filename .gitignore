@@ -8,3 +8,8 @@ output/
 *.pkl
 __pycache__/
 .DS_Store
+build/
+dist/
+settings.json
+last_paths.json
+결과/

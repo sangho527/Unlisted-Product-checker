@@ -177,7 +177,7 @@ for i in range(3,len(R)+3):
     c=ws.cell(i,1); c.fill=PatternFill('solid',fgColor=next(v for k,v in NF.items() if str(c.value).startswith(k)))
 # 1) 요약
 O="'옵션별_점검'"; P="'상품별_한눈에보기'"; ws=ws0; b=Font(name=F,bold=True,size=10)
-ws['A1']='무신사 옵션 재고 점검 — 어반드레스 (판매중 상품, 젠더스트·비바셔스·미발매 제외)'; ws['A1'].font=Font(name=F,bold=True,size=14)
+ws['A1']=f'무신사 옵션 재고 점검 — {cfg.BRAND_KR} (판매중 상품, 다른 브랜드·미발매 제외)'; ws['A1'].font=Font(name=F,bold=True,size=14)
 ws['A3']=('[이 시트] 파일 전체 결과를 숫자로 모은 시트입니다. 다른 시트를 수식으로 집계해서 다른 시트를 고치면 숫자도 같이 바뀝니다. '
           '작업 순서: 상품별_한눈에보기 → 상품명_대조(스타일넘버 수정) → 무신사에_옵션없음.')
 ws['A3'].font=Font(name=F,size=10,color='1F3864')
@@ -230,5 +230,7 @@ for row in ws.iter_rows():
     for x in row:
         if x.value is not None and x.font.name!=F: x.font=Font(name=F,size=10)
         if isinstance(x.value,(int,str)) and x.column>1 and (isinstance(x.value,int) or str(x.value).startswith('=')): x.number_format='#,##0'
+from openpyxl.workbook.properties import CalcProperties
+wb.calculation=CalcProperties(fullCalcOnLoad=True)
 wb.save(cfg.OUT+f'무신사_옵션재고점검_{cfg.TODAY}.xlsx')
 print(L['점검결과'].value_counts())

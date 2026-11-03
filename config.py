@@ -3,13 +3,15 @@
 - 입력 파일은 data/ 폴더에 아래 이름으로 넣어주세요 (이름이 다르면 여기서 바꾸면 됩니다).
 - data/, output/ 폴더는 .gitignore 처리되어 있어 레포에 올라가지 않습니다 (재고·원가 등 내부 데이터 보호).
 """
-import os, datetime
+import os, sys, json, datetime
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# exe(PyInstaller)로 실행하면 exe가 있는 폴더, 아니면 이 파일이 있는 폴더
+ROOT = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(ROOT, 'data') + os.sep
 OUT  = os.path.join(ROOT, 'output') + os.sep
 WORK = os.path.join(OUT, 'work') + os.sep
-os.makedirs(WORK, exist_ok=True)
+if not getattr(sys, 'frozen', False):   # exe는 결과 폴더를 고른 뒤 만듦
+    os.makedirs(WORK, exist_ok=True)
 TODAY = datetime.date.today().strftime('%Y%m%d')
 
 # ---- 입력 파일 ----
@@ -50,3 +52,39 @@ SELLMATE_NOTES = {   # 셀메이트 상품코드 앞 8자리 기준
 
 def fname(p):
     return os.path.basename(p)
+
+# ---- settings.json (선택) ----
+# exe 사용자가 코드 수정 없이 브랜드·제외 규칙·수동 연결을 바꿀 수 있도록, ROOT/settings.json 이 있으면 덮어씁니다.
+SETTINGS_KEYS = ['BRAND_KR', 'TARGET_CODE_PATTERN', 'EXCLUDE_CODE_PATTERN', 'MANUAL_LINKS',
+                 'MANUAL_SHORT_LINKS', 'LISTING_NOTES', 'SELLMATE_NOTES']
+SETTINGS_FILE = os.path.join(ROOT, 'settings.json')
+
+def current_settings():
+    g = globals()
+    return {k: g[k] for k in SETTINGS_KEYS}
+
+def load_settings(path=None):
+    path = path or SETTINGS_FILE
+    if not os.path.exists(path):
+        return False
+    with open(path, encoding='utf-8') as f:
+        data = json.load(f)
+    g = globals()
+    for k in SETTINGS_KEYS:
+        if k in data:
+            g[k] = data[k]
+    return True
+
+def save_settings(path=None):
+    path = path or SETTINGS_FILE
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(current_settings(), f, ensure_ascii=False, indent=2)
+
+def set_output(out_dir):
+    """결과 폴더 변경 (작업 파일은 out_dir/work)"""
+    global OUT, WORK
+    OUT = os.path.join(out_dir, '') 
+    WORK = os.path.join(out_dir, 'work', '')
+    os.makedirs(WORK, exist_ok=True)
+
+load_settings()

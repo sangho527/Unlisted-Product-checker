@@ -1,0 +1,56 @@
+name: Build Windows exe
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', 'src/**', 'search/**', 'config.py', 'musinsa_checker.spec', '.github/workflows/build-exe.yml']
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas openpyxl pyinstaller
+
+      - name: Build exe
+        run: pyinstaller --noconfirm musinsa_checker.spec
+
+      - name: Smoke test (import check)
+        shell: pwsh
+        run: |
+          python -c "import sys; sys.path[:0]=['.','app']; import runner, config; print('ok', config.BRAND_KR)"
+          Get-Item dist/MusinsaChecker.exe | Select-Object Name, Length
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force pkg | Out-Null
+          Copy-Item dist/MusinsaChecker.exe pkg/
+          Copy-Item docs/사용법.txt pkg/
+          Compress-Archive -Path pkg/* -DestinationPath MusinsaChecker-windows.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MusinsaChecker-windows
+          path: MusinsaChecker-windows.zip
+          retention-days: 30
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MusinsaChecker-windows.zip

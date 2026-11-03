@@ -1,0 +1,21 @@
+# PyInstaller 설정 — Windows exe 빌드용 (GitHub Actions: .github/workflows/build-exe.yml)
+#   pyinstaller musinsa_checker.spec
+import os
+block_cipher = None
+ROOT = os.path.abspath('.')
+
+a = Analysis(
+    ['app/gui.py'],
+    pathex=[ROOT, os.path.join(ROOT, 'app')],
+    datas=[('src', 'src'), ('search', 'search')],
+    hiddenimports=['config', 'runner', 'openpyxl', 'openpyxl.workbook.properties', 'pandas', 'numpy', 'difflib', 'urllib.parse'],
+    excludes=['matplotlib', 'scipy', 'IPython', 'pytest', 'PyQt5', 'PySide2'],
+    cipher=block_cipher,
+)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+exe = EXE(
+    pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [],
+    name='MusinsaChecker',
+    console=False,
+    upx=False,
+)

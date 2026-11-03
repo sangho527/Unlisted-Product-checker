@@ -11,11 +11,30 @@
 
 ---
 
+## 바로 쓰기 (Windows exe)
+
+개발 환경 없이 쓰려면 **MusinsaChecker.exe**를 받으세요.
+
+1. GitHub → **Actions** → `Build Windows exe` → 최신 실행 → 하단 **Artifacts**의 `MusinsaChecker-windows` 다운로드 (또는 Releases에 올라간 zip)
+2. 압축을 풀고 `MusinsaChecker.exe` 실행 → 파일 4개 선택 → **[점검 시작]**
+3. 자세한 사용법은 zip 안의 `사용법.txt` ([docs/사용법.txt](docs/사용법.txt))
+
+처음 실행할 때 Windows 보호 화면이 뜨면 "추가 정보 → 실행"을 누르세요 (서명되지 않은 exe라서 뜨는 안내입니다).
+브랜드·제외 규칙·수동 연결은 화면의 **[설정]** 버튼(settings.json)에서 바꿀 수 있습니다.
+
+exe 빌드: `main`에 `app/`, `src/`, `search/`, `config.py`가 바뀌어 push되면 GitHub Actions(`.github/workflows/build-exe.yml`)가 Windows에서 PyInstaller로 자동 빌드합니다. 직접 빌드하려면 Windows에서 `pip install pandas openpyxl pyinstaller` 후 `pyinstaller musinsa_checker.spec`.
+
+---
+
 ## 폴더 구조
 
 ```
 ├─ config.py                 # 입력 파일 경로, 브랜드 코드 규칙, 사람이 확인한 수동 연결
-├─ run_all.py                # 전체 실행
+├─ run_all.py                # 전체 실행 (명령줄)
+├─ app/
+│  ├─ gui.py                 # exe 실행 화면 (tkinter)
+│  └─ runner.py              # 화면·명령줄 공용 실행 모듈
+├─ musinsa_checker.spec      # PyInstaller 설정 (exe 빌드)
 ├─ src/
 │  ├─ load_data.py           # 셀메이트 CSV / 무신사 전체 상품 엑셀 읽기
 │  ├─ step1_listing_match.py # 1. 셀메이트 상품(컬러) ↔ 무신사 상품 매칭

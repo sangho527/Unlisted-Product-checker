@@ -2,13 +2,13 @@
  * 무신사 검색 노출 확인 스크립트 ("브랜드명 + 상품명" 검색)
  *
  * 사용법
- *   1) python run_all.py 를 실행하면 output/musinsa_brand_search_ready.js 가 만들어집니다.
- *      (이 파일에 검색할 상품번호·검색어가 이미 들어가 있습니다)
+ *   1) MusinsaChecker.exe 의 [① 상품 목록 만들기] (또는 python app/runner.py <재고관리_복사본.xlsx>)를 실행하면
+ *      결과 폴더에 musinsa_brand_search_ready.js 가 만들어집니다. (검색할 상품번호·검색어가 들어가 있음)
+ *      exe 에서는 [② 검색 스크립트 복사 + 무신사 열기] 버튼이 이 내용을 복사해 줍니다.
  *   2) Chrome 에서 https://www.musinsa.com 을 열고 F12 → Console 탭을 엽니다. (로그인 필요 없음)
  *   3) musinsa_brand_search_ready.js 내용을 통째로 붙여넣고 Enter.
  *   4) 끝나면 결과가 클립보드에 복사됩니다. (콘솔에도 출력)
- *      → data/search_brand.txt 로 저장한 뒤 python run_all.py 를 다시 실행하면
- *        결과 엑셀에 '무신사_검색노출' 시트가 생깁니다.
+ *      → exe 의 [③ 검색 결과 붙여넣기] (또는 텍스트 파일로 저장해 runner.py 세 번째 인자로)
  *
  * 판정 기준
  *   - 검색어: "<BRAND> <상품명>"  (상품명은 컬러명·_3COL 같은 컬러 묶음 표시를 뗀 이름)
@@ -24,11 +24,11 @@
  */
 (async () => {
   const BRAND = "어반드레스";
-  const KEYWORDS = [];            // [["무신사 상품번호", "검색어(브랜드명 제외)"], ...]  ← step5 가 채워줍니다
+  const KEYWORDS = [];            // [["무신사 상품번호", "검색어(브랜드명 제외)"], ...]  ← exe [① 상품 목록 만들기]가 채워줍니다
   const DELAY_MS = 400;
 
   if (!/musinsa\.com$/.test(location.hostname)) { console.warn('www.musinsa.com 페이지에서 실행하세요.'); return; }
-  if (!KEYWORDS.length) { console.warn('KEYWORDS 가 비어 있습니다. output/musinsa_brand_search_ready.js 를 사용하세요.'); return; }
+  if (!KEYWORDS.length) { console.warn('KEYWORDS 가 비어 있습니다. 결과 폴더의 musinsa_brand_search_ready.js 를 사용하세요.'); return; }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const cache = {}, lines = [];
 
@@ -54,8 +54,8 @@
 
   const text = lines.join('\n');
   window.__musinsaSearchResult = text;
-  try { await navigator.clipboard.writeText(text); console.log('결과를 클립보드에 복사했습니다 → data/search_brand.txt 로 저장하세요.'); }
-  catch (e) { console.log('클립보드 복사 실패 — 아래 내용을 복사해 data/search_brand.txt 로 저장하세요.'); }
+  try { await navigator.clipboard.writeText(text); console.log('결과를 클립보드에 복사했습니다 → exe 에서 [③ 검색 결과 붙여넣기]를 누르세요.'); }
+  catch (e) { console.log('클립보드 복사 실패 — 아래 결과를 직접 복사한 뒤 exe 에서 [③ 검색 결과 붙여넣기]를 누르세요.'); }
   const miss = lines.filter((l) => l.split('|')[2] === '');
   console.log(`완료: ${lines.length}개 중 검색 안 됨 ${miss.length}개`);
   console.log(text);

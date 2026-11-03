@@ -75,10 +75,13 @@ def load_settings(path=None):
             g[k] = data[k]
     return True
 
-def save_settings(path=None):
+def save_settings(path=None, keys=None):
     path = path or SETTINGS_FILE
+    data = current_settings()
+    if keys:
+        data = {k: data[k] for k in keys}
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(current_settings(), f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 def set_output(out_dir):
     """결과 폴더 변경 (작업 파일은 out_dir/work)"""

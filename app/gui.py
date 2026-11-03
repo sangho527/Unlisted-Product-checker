@@ -77,7 +77,7 @@ class App(tk.Tk):
         sb = ttk.LabelFrame(self, text=' 4. 점검 '); sb.pack(fill='x', **pad)
         self.btn1 = ttk.Button(sb, text='① 옵션 재고 점검 + 검색 준비', command=self.prepare)
         self.btn1.grid(row=0, column=0, padx=8, pady=6, sticky='ew', ipady=3)
-        ttk.Label(sb, foreground='#444', justify='left', wraplength=470, text='셀메이트 재고 ↔ 무신사 옵션을 대조해 옵션 재고 점검 엑셀을 만들고,\n판매중 상품 전체의 검색어(컬러·COL 표기 제외)를 만듭니다.').grid(row=0, column=1, sticky='w')
+        ttk.Label(sb, foreground='#444', justify='left', wraplength=470, text='셀메이트 재고 ↔ 무신사 옵션을 대조해 옵션 재고 점검 엑셀을 만들고,\n그중 조치가 필요한 상품(상품별_한눈에보기)만 검색어(컬러·COL 표기 제외)를 만듭니다.').grid(row=0, column=1, sticky='w')
         self.btn2 = ttk.Button(sb, text='② 검색 스크립트 복사 + 무신사 열기', command=self.copy_search)
         self.btn2.grid(row=1, column=0, padx=8, pady=6, sticky='ew', ipady=3)
         ttk.Label(sb, foreground='#444', justify='left', wraplength=470, text=(
@@ -231,7 +231,7 @@ class App(tk.Tk):
             '1) 재고 관리(v2) 표를 복사해 엑셀로 저장한 파일과 셀메이트 재고목록(CSV)을 고릅니다.\n'
             '2) ① 옵션 재고 점검 + 검색 준비 → 무신사_옵션재고점검 엑셀 생성\n'
             '3) ② 검색 스크립트 복사 + 무신사 열기 → 크롬 F12 → Console → Ctrl+V → Enter\n'
-            '   (상품 1,000개 기준 약 10분, 그동안 그 탭을 닫지 마세요)\n'
+            '   (상품별_한눈에보기 상품만 검색, 300개 기준 약 3분. 그동안 그 탭을 닫지 마세요)\n'
             '4) 콘솔에 "완료"가 나오면 ③ 검색 결과 붙여넣기\n'
             '5) 무신사_옵션재고점검 → "상품별_한눈에보기", 무신사_검색노출점검 → "검색_미노출" 시트 확인\n\n'
             '검색은 "브랜드명 + 상품명(컬러·_3COL 표기 제외)"으로 하고,\n'

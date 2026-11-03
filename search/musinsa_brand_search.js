@@ -29,6 +29,8 @@
 
   if (!/musinsa\.com$/.test(location.hostname)) { console.warn('www.musinsa.com 페이지에서 실행하세요.'); return; }
   if (!KEYWORDS.length) { console.warn('KEYWORDS 가 비어 있습니다. 결과 폴더의 musinsa_brand_search_ready.js 를 사용하세요.'); return; }
+  if (window.__musinsaSearchRunning) { console.warn('이미 검색이 실행 중입니다. 다시 시작하려면 페이지를 새로고침(F5)한 뒤 붙여넣으세요.'); return; }
+  window.__musinsaSearchRunning = true;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const cache = {}, lines = [];
 
@@ -52,6 +54,7 @@
     if ((n + 1) % 20 === 0) console.log(`진행 ${n + 1}/${KEYWORDS.length}`);
   }
 
+  window.__musinsaSearchRunning = false;
   const text = lines.join('\n');
   window.__musinsaSearchResult = text;
   try { await navigator.clipboard.writeText(text); console.log('결과를 클립보드에 복사했습니다 → exe 에서 [③ 검색 결과 붙여넣기]를 누르세요.'); }

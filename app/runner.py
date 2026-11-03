@@ -116,7 +116,12 @@ def prepare(stock_copy_path, sellmate_path, out_dir, log=_console):
     _run_steps(OPTION_STEPS, log)
     log(f'      → {os.path.basename(P["option_report"])}')
 
-    log('3/4 브라우저 검색 스크립트 만드는 중 (판매중 상품 전체) ...')
+    # 검색 대상: 옵션 재고 점검에서 조치가 필요하다고 나온 상품(상품별_한눈에보기)만
+    hv = pandas.read_excel(P['option_report'], '상품별_한눈에보기', header=1, dtype=str)
+    targets = set(hv.iloc[:, 1].dropna().astype(str))
+    L = L[L['상품번호'].astype(str).isin(targets)].reset_index(drop=True)
+    L.to_pickle(P['listings'])
+    log(f'3/4 브라우저 검색 스크립트 만드는 중 (상품별_한눈에보기 상품 {len(L):,}개) ...')
     sc.write_search_script(L, cfg.BRAND_KR, SCRIPT_TEMPLATE, P['script'])
     log('4/4 검색 노출 엑셀(검색 전) 만드는 중 ...')
     sc.write_report(L, None, cfg.BRAND_KR, P['report'], meta['source'], excluded)

@@ -52,3 +52,21 @@ with open(os.path.join(out, 'sellmate_stock.csv'), 'w', encoding='cp949', newlin
 with open(os.path.join(out, 'search_result.txt'), 'w', encoding='utf-8') as f:
     f.write('9000001|1|1|1\n9000002|1|1|1\n9000003|1||0\n9000004|3||2\n')
 print('fixture →', out)
+
+# ---- 29CM 옵션재고 일괄변경 파일 (페이지 2개, 1줄 겹침) — 위쪽 안내문 2줄 + 머리글 ----
+C29 = ['스타일 번호', '상품 번호', '상품명', '브랜드', '옵션 번호', '옵션명', '옵션 판매 상태', '재고 버전', '재고 수량\n(변경 전)',
+       '재고 수량\n(변경 후)', '옵션 추가 가격\n(변경 전)', '옵션 추가 가격\n(변경 후)', '판매가', '누적 판매량', '재입고 알림 여부\n(변경 전)',
+       '재입고 알림 여부\n(변경 후)']
+def r29(pno, name, oid, opt, st, qty):
+    return [f'{pno}-{oid}', pno, name, 'AVANDRESS', oid, opt, st, '', qty, '', 0, '', 39000, 0, 'N', '']
+p1 = [r29('3000001', 'Test Crop Tee_2Colors', '1', '[색상]BLACK [사이즈]S', '판매중', 10),
+      r29('3000001', 'Test Crop Tee_2Colors', '2', '[색상]BLACK [사이즈]M', '일시품절', 0),     # 셀메이트 5개 → ①
+      r29('3000001', 'Test Crop Tee_2Colors', '3', '[색상]WHITE [사이즈]S', '판매중', 7),
+      r29('3000002', '테스트 와이드 팬츠 BLUE', '4', '[사이즈]S', '판매중지', 0)]                 # 셀메이트 3개 → ②
+p2 = [r29('3000002', '테스트 와이드 팬츠 BLUE', '4', '[사이즈]S', '판매중지', 0),                 # 1페이지와 겹침
+      r29('3000002', '테스트 와이드 팬츠 BLUE', '5', '[사이즈]M', '판매중', 4),
+      r29('3000003', 'Test Mini Skirt BLACK', '6', '[사이즈]S', '판매중', 2)]                       # 셀메이트 0 → ④
+for fn, rows_ in [('cm29_page1.xlsx', p1), ('cm29_page2.xlsx', p2)]:
+    top = [['[자동 입력 / 수정 불가]'] * len(C29), ['기존 정보 확인'] + [None] * (len(C29) - 1), C29]
+    pd.DataFrame(top + rows_).to_excel(os.path.join(out, fn), index=False, header=False, sheet_name='옵션')
+print('29CM fixture →', out)

@@ -1,5 +1,5 @@
 """
-무신사 판매중 상품 점검 (옵션 재고 + 검색 노출) — 실행 화면 (Windows exe 진입점)
+판매중 상품 점검 (무신사 · 29CM) — 옵션 재고 + 검색 노출 — 실행 화면 (Windows exe 진입점)
 """
 import os, sys, json, queue, threading, traceback, webbrowser
 import tkinter as tk
@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runner  # noqa: E402
 cfg = runner.cfg
 
-APP_TITLE = '무신사 판매중 상품 점검'
+APP_TITLE = '판매중 상품 점검 (무신사 · 29CM)'
+PLATFORMS = ('무신사', '29CM')
 FONT = ('맑은 고딕', 10)
 FONT_B = ('맑은 고딕', 10, 'bold')
 LAST_FILE = os.path.join(cfg.ROOT, 'last_paths.json')
@@ -39,6 +40,8 @@ class App(tk.Tk):
         self.busy = False
         self.stop_ev = threading.Event()
         self.in_var = tk.StringVar()
+        self.cm_var = tk.StringVar()
+        self.plat = tk.StringVar(value='무신사')
         self.sm_var = tk.StringVar()
         self.out_var = tk.StringVar(value=os.path.join(cfg.ROOT, '결과'))
         self._load_last()
@@ -53,13 +56,17 @@ class App(tk.Tk):
         ttk.Button(top, text='설정(브랜드명)', command=self.open_settings).pack(side='right')
         ttk.Button(top, text='사용법', command=self.show_help).pack(side='right', padx=6)
 
-        box = ttk.LabelFrame(self, text=' 1. 무신사 재고 관리(v2) 복사본 '); box.pack(fill='x', **pad)
-        ttk.Entry(box, textvariable=self.in_var).grid(row=0, column=0, sticky='ew', padx=8, pady=(8, 0))
+        pf = ttk.LabelFrame(self, text=' 판매채널 '); pf.pack(fill='x', **pad)
+        for i, name in enumerate(PLATFORMS):
+            ttk.Radiobutton(pf, text=name, value=name, variable=self.plat, command=self._on_platform).pack(side='left', padx=(10 if i == 0 else 4, 8), pady=6)
+        ttk.Label(pf, foreground='#777', text='채널을 고르면 아래 1번 입력 파일과 결과 엑셀이 그 채널용으로 바뀝니다.').pack(side='left', padx=8)
+
+        self.box = box = ttk.LabelFrame(self, text=' 1. 무신사 재고 관리(v2) 복사본 '); box.pack(fill='x', **pad)
+        self.in_entry = ttk.Entry(box, textvariable=self.in_var)
+        self.in_entry.grid(row=0, column=0, sticky='ew', padx=8, pady=(8, 0))
         ttk.Button(box, text='찾아보기', command=self.pick_in).grid(row=0, column=1, padx=8, pady=(8, 0))
-        ttk.Label(box, foreground='#555', justify='left', wraplength=760, text=(
-            '파트너센터 → 상품/재고 → 재고 관리(v2) → 상품상태 "판매중", 출력수 5000 → 표를 전부 드래그해 복사(Ctrl+C) '
-            '→ 엑셀 새 파일에 붙여넣기(Ctrl+V) → 저장.  머리글 없이 붙여넣어도 되고, 필요한 열만 자동으로 골라 씁니다. '
-            '(5000건이 넘으면 2페이지도 이어서 붙여넣기)')).grid(row=1, column=0, columnspan=2, sticky='w', padx=8, pady=(2, 8))
+        self.in_help = ttk.Label(box, foreground='#555', justify='left', wraplength=760)
+        self.in_help.grid(row=1, column=0, columnspan=2, sticky='w', padx=8, pady=(2, 8))
         box.columnconfigure(0, weight=1)
 
         sm = ttk.LabelFrame(self, text=' 2. 셀메이트 재고목록 (stk_stockList_*.csv) '); sm.pack(fill='x', **pad)
@@ -78,10 +85,8 @@ class App(tk.Tk):
         sb = ttk.LabelFrame(self, text=' 4. 점검 '); sb.pack(fill='x', **pad)
         self.btn1 = ttk.Button(sb, text='▶ 점검 시작', command=self.start_all)
         self.btn1.grid(row=0, column=0, padx=8, pady=6, sticky='ew', ipady=6)
-        ttk.Label(sb, foreground='#444', justify='left', wraplength=520, text=(
-            '① 셀메이트 재고 ↔ 무신사 옵션 대조 → 무신사_옵션재고점검 엑셀\n'
-            '② 크롬을 띄워 무신사 검색창에 판매중 상품을 하나씩 검색 → 무신사_검색노출점검 엑셀 + 미노출 화면 캡처\n'
-            '   (상품 1,000개 기준 40~60분. 검색하는 크롬 창은 건드리지 마세요. 최소화는 괜찮습니다)')).grid(row=0, column=1, columnspan=2, sticky='w')
+        self.run_help = ttk.Label(sb, foreground='#444', justify='left', wraplength=520)
+        self.run_help.grid(row=0, column=1, columnspan=2, sticky='w')
         self.btn_stop = ttk.Button(sb, text='■ 중지', command=self.stop_search, state='disabled')
         self.btn_stop.grid(row=1, column=0, padx=8, pady=(0, 6), sticky='ew')
         self.btn2 = ttk.Button(sb, text='검색만 이어서 하기', command=self.resume_search)
@@ -98,10 +103,41 @@ class App(tk.Tk):
         lb = ttk.LabelFrame(self, text=' 진행 상황 '); lb.pack(fill='both', expand=True, **pad)
         self.log_box = ScrolledText(lb, height=10, font=('Consolas', 9), state='disabled')
         self.log_box.pack(fill='both', expand=True, padx=6, pady=6)
-        self.log('재고 관리(v2) 복사본과 셀메이트 재고목록을 고르고 [▶ 점검 시작]을 누르세요.')
+        self._on_platform()
+        self.log('판매채널을 고르고, 1번 파일과 셀메이트 재고목록을 고른 뒤 [▶ 점검 시작]을 누르세요.')
+
+    def _on_platform(self):
+        cm = self.plat.get() == '29CM'
+        self.box.configure(text=' 1. 29CM 옵션재고 일괄변경 파일 (여러 개 한꺼번에 선택) ' if cm else ' 1. 무신사 재고 관리(v2) 복사본 ')
+        self.in_entry.configure(textvariable=self.cm_var if cm else self.in_var)
+        self.in_help.configure(text=(
+            '29Connect → 옵션/재고 관리 → 판매상태 "판매중" → 페이지마다 엑셀 다운로드한 '
+            '"29CM_옵션재고_일괄변경(파트너)_페이지…" 파일들. [찾아보기]에서 Ctrl·Shift로 여러 개를 한꺼번에 고르세요. '
+            '페이지 순서는 상관없고, 겹친 옵션은 한 번만 셉니다.') if cm else (
+            '파트너센터 → 상품/재고 → 재고 관리(v2) → 상품상태 "판매중", 출력수 5000 → 표를 전부 드래그해 복사(Ctrl+C) '
+            '→ 엑셀 새 파일에 붙여넣기(Ctrl+V) → 저장.  머리글 없이 붙여넣어도 되고, 필요한 열만 자동으로 골라 씁니다. '
+            '(5000건이 넘으면 2페이지도 이어서 붙여넣기)'))
+        p = self.plat.get()
+        self.run_help.configure(text=(
+            f'① 셀메이트 재고 ↔ {p} 옵션 대조 → {p}_옵션재고점검 엑셀\n'
+            f'② 크롬을 띄워 {p} 검색창에 판매중 상품을 하나씩 검색 → {p}_검색노출점검 엑셀 + 미노출 화면 캡처\n'
+            '   (상품 1,000개 기준 40~60분. 검색하는 크롬 창은 건드리지 마세요. 최소화는 괜찮습니다)'))
+        if not self.busy:
+            for b in (self.btn3, self.btn4):
+                b.configure(state='disabled' if cm else 'normal')
 
     # ---------- 동작 ----------
+    def _cm_files(self):
+        return [p.strip() for p in self.cm_var.get().split(';') if p.strip()]
+
     def pick_in(self):
+        if self.plat.get() == '29CM':
+            ps = filedialog.askopenfilenames(title='29CM 옵션재고 일괄변경 파일 선택 (여러 개)', filetypes=[('Excel', '*.xlsx'), ('모든 파일', '*.*')],
+                                             initialdir=os.path.dirname((self._cm_files() or [os.path.join(cfg.ROOT, 'x')])[0]))
+            if ps:
+                self.cm_var.set('; '.join(os.path.normpath(p) for p in ps))
+                self.log(f'29CM 파일 {len(ps)}개를 골랐습니다.')
+            return
         p = filedialog.askopenfilename(title='재고 관리(v2) 복사본 선택', filetypes=[('Excel', '*.xlsx'), ('모든 파일', '*.*')],
                                        initialdir=os.path.dirname(self.in_var.get() or cfg.ROOT))
         if p:
@@ -148,8 +184,9 @@ class App(tk.Tk):
 
     def _set_busy(self, busy):
         self.busy = busy
+        cm = self.plat.get() == '29CM'
         for b in (self.btn1, self.btn2, self.btn3, self.btn4):
-            b.configure(state='disabled' if busy else 'normal')
+            b.configure(state='disabled' if busy or (cm and b in (self.btn3, self.btn4)) else 'normal')
         self.btn_stop.configure(state='normal' if busy else 'disabled')
         if not busy:
             self.pb.stop(); self.pb.configure(mode='determinate', value=0)
@@ -188,12 +225,15 @@ class App(tk.Tk):
             if i == 1:
                 self.q.put(('log', ''))
             self.q.put(('prog', (i, n)))
+        if self.plat.get() == '29CM':
+            return lambda log: runner.auto_search_29cm(out, log=log, stop=self.stop_ev, progress=prog)
         return lambda log: runner.auto_search(out, log=log, stop=self.stop_ev, progress=prog)
 
     def _done_search(self, report):
         if not report:
             return
-        msg = '점검을 마쳤습니다.\n\n· 무신사_검색노출점검 → "검색_미노출" 시트\n· 무신사_옵션재고점검 → "상품별_한눈에보기" 시트\n· 미노출_캡처 폴더: 검색 안 된 상품의 검색 화면\n\n결과 폴더를 열까요?'
+        p = self.plat.get(); cap = '29CM_미노출_캡처' if p == '29CM' else '미노출_캡처'
+        msg = f'점검을 마쳤습니다.\n\n· {p}_검색노출점검 → "검색_미노출" 시트\n· {p}_옵션재고점검 → "상품별_한눈에보기" 시트\n· {cap} 폴더: 검색 안 된 상품의 검색 화면\n\n결과 폴더를 열까요?'
         if self.stop_ev.is_set():
             msg = '검색을 중지했습니다. 지금까지 검색한 결과로 엑셀을 만들었습니다 (나머지는 "미확인").\n[검색만 이어서 하기]로 계속할 수 있습니다.\n\n결과 폴더를 열까요?'
         if messagebox.askyesno(APP_TITLE, msg):
@@ -205,14 +245,20 @@ class App(tk.Tk):
         out = self._out()
         if not out:
             return
-        src = self.in_var.get().strip()
         smf = self.sm_var.get().strip()
         self._save_last()
         self.log('')
         search = self._search_fn(out)
-        def both(log):
-            runner.prepare(src, smf, out, log=log)
-            return search(log)
+        if self.plat.get() == '29CM':
+            files = self._cm_files()
+            def both(log):
+                runner.prepare_29cm(files, smf, out, log=log)
+                return search(log)
+        else:
+            src = self.in_var.get().strip()
+            def both(log):
+                runner.prepare(src, smf, out, log=log)
+                return search(log)
         self._work(both, self._done_search)
 
     def resume_search(self):
@@ -259,7 +305,7 @@ class App(tk.Tk):
         if not os.path.exists(cfg.SETTINGS_FILE):
             cfg.save_settings(keys=['BRAND_KR', 'EXCLUDE_CODE_PATTERN'])
         messagebox.showinfo(APP_TITLE, '설정 파일(settings.json)을 엽니다.\n\n'
-                            'BRAND_KR: 무신사에 표시되는 브랜드명 (검색어 앞에 붙고, 검색 결과의 브랜드를 이 이름으로 확인)\n'
+                            'BRAND_KR: 무신사·29CM에 표시되는 브랜드명 (검색어 앞에 붙고, 검색 결과의 브랜드를 이 이름으로 확인)\n'
                             'EXCLUDE_CODE_PATTERN: 점검에서 뺄 스타일넘버 규칙 (예: ^(ZD|VV) = ZD·VV로 시작하는 상품 제외)\n\n'
                             '저장한 뒤 [▶ 점검 시작]부터 다시 실행하면 반영됩니다.')
         open_path(cfg.SETTINGS_FILE)
@@ -279,13 +325,19 @@ class App(tk.Tk):
             '3) 결과 폴더\n'
             '   · 무신사_검색노출점검 → "검색_미노출" 시트 ("캡처 보기"로 화면 확인)\n'
             '   · 무신사_옵션재고점검 → "상품별_한눈에보기" 시트\n\n'
-            '자동 검색이 안 되면 아래 "예비" 버튼으로 크롬 콘솔(F12)에서 검색할 수 있습니다.'))
+            '자동 검색이 안 되면 아래 "예비" 버튼으로 크롬 콘솔(F12)에서 검색할 수 있습니다 (무신사만).\n\n'
+            '[29CM]\n'
+            '판매채널에서 29CM를 고르고, 1번에 "29CM_옵션재고_일괄변경(파트너)_페이지…" 파일을 전부 고릅니다(여러 개 선택).\n'
+            '29CM 파일에는 셀메이트 상품코드가 없어서 상품명(컬러·_3Colors 표기 제외, 한글↔영문 포함)으로 셀메이트 상품을 찾습니다.\n'
+            '결과: 29CM_옵션재고점검(상품별_한눈에보기·옵션별_대조·29CM에_옵션없음·상품매칭_확인필요), 29CM_검색노출점검, 29CM_미노출_캡처'))
 
     def _load_last(self):
         try:
             with open(LAST_FILE, encoding='utf-8') as f:
                 d = json.load(f)
             if d.get('in'): self.in_var.set(d['in'])
+            if d.get('cm29'): self.cm_var.set(d['cm29'])
+            if d.get('platform') in PLATFORMS: self.plat.set(d['platform'])
             if d.get('sellmate'): self.sm_var.set(d['sellmate'])
             if d.get('out'): self.out_var.set(d['out'])
         except Exception:
@@ -294,13 +346,36 @@ class App(tk.Tk):
     def _save_last(self):
         try:
             with open(LAST_FILE, 'w', encoding='utf-8') as f:
-                json.dump({'in': self.in_var.get(), 'sellmate': self.sm_var.get(), 'out': self.out_var.get()}, f, ensure_ascii=False, indent=2)
+                json.dump({'in': self.in_var.get(), 'cm29': self.cm_var.get(), 'platform': self.plat.get(),
+                           'sellmate': self.sm_var.get(), 'out': self.out_var.get()}, f, ensure_ascii=False, indent=2)
         except Exception:
             pass
 
 
-def selftest(fixture_dir, out_dir, auto_base=None):
-    """화면 없이 실행 (빌드 확인용): MusinsaChecker.exe --selftest <입력폴더> <결과폴더> [가짜 무신사 주소]"""
+def selftest_29cm(fixture_dir, out_dir, log, auto_base=None):
+    """29CM: 페이지 파일 2개(1줄 겹침) + 셀메이트 → 옵션 판정, (가짜 29CM 페이지에서) 자동 검색"""
+    import pandas as pd
+    out = os.path.join(out_dir, '29cm')
+    files = [os.path.join(fixture_dir, f) for f in ('cm29_page1.xlsx', 'cm29_page2.xlsx')]
+    P = runner.prepare_29cm(files, os.path.join(fixture_dir, 'sellmate_stock.csv'), out, log=log)
+    O = pd.read_excel(P['option_report'], '옵션별_대조', header=1, dtype=str)
+    j = {(a, b): c for a, b, c in zip(O['29CM 상품명'], O['29CM 옵션명'], O['판정'])}
+    log(f'29CM 옵션 판정: {j}')
+    ok = len(O) == 6 and j.get(('Test Crop Tee_2Colors', '[색상]BLACK [사이즈]M')) == '셀메이트 재고 있는데 29CM 품절' \
+        and j.get(('테스트 와이드 팬츠 BLUE', '[사이즈]S')) == '셀메이트 재고 있는데 29CM 판매중지'
+    if ok and auto_base:
+        report = runner.auto_search_29cm(out, log=log, headless=True, base=auto_base)
+        R = pd.read_excel(report, '전체_검색결과', header=1, dtype=str)
+        st = dict(zip(R['29CM 상품번호'], R['검색여부']))
+        log(f'29CM 자동 검색 결과: {st}')
+        ok = st.get('3000001') == '검색됨' and st.get('3000002') == '검색 안 됨' and st.get('3000003', '').startswith('검색됨') \
+            and os.path.exists(os.path.join(out, '29CM_미노출_캡처'))
+    log('29CM ' + ('OK' if ok else 'FAIL'))
+    return ok
+
+
+def selftest(fixture_dir, out_dir, auto_base=None, auto_base_29cm=None):
+    """화면 없이 실행 (빌드 확인용): MusinsaChecker.exe --selftest <입력폴더> <결과폴더> [가짜 무신사 주소] [가짜 29CM 주소]"""
     os.makedirs(out_dir, exist_ok=True)
     logf = open(os.path.join(out_dir, 'selftest.log'), 'w', encoding='utf-8')
     log = lambda m: (logf.write(m + '\n'), logf.flush())
@@ -326,6 +401,7 @@ def selftest(fixture_dir, out_dir, auto_base=None):
                 hit = hv[hv.iloc[:, 1] == '9000001']
                 ok = len(hit) == 1 and hit.iloc[0, 0].startswith('①')
                 log(f'옵션 점검 확인: 9000001 → {hit.iloc[0, 0] if len(hit) else "없음"}')
+        ok = selftest_29cm(fixture_dir, out_dir, log, auto_base_29cm) and ok
         log('SELFTEST ' + ('OK' if ok else 'FAIL'))
         return 0 if ok else 1
     except Exception:
@@ -337,5 +413,6 @@ def selftest(fixture_dir, out_dir, auto_base=None):
 
 if __name__ == '__main__':
     if len(sys.argv) >= 4 and sys.argv[1] == '--selftest':
-        sys.exit(selftest(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None))
+        sys.exit(selftest(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None,
+                          sys.argv[5] if len(sys.argv) > 5 else None))
     App().mainloop()

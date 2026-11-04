@@ -81,7 +81,9 @@ EN_BASE = set(KO.values()) | {'BLACK', 'WHITE', 'IVORY', 'BEIGE', 'CHARCOAL', 'G
                               'MELANGE', 'OATMEAL', 'MOCHA', 'MOCA', 'CAMEL', 'GREEN', 'YELLOW', 'MINT', 'LAVENDER', 'WINE',
                               'SILVER', 'GOLD', 'ORANGE', 'INDIGO', 'BUTTER', 'SALAD', 'SORA', 'STITCH', 'COATING', 'CAMO',
                               'MULTI', 'CHECK', 'SALT'}
-NOT_COLOR = {'AV', 'T', 'SET', 'UNISEX', 'HOODIE', 'HOODY', 'SHIRT', 'PANTS', 'TOP', 'CROP', 'TEE', 'SKIRT', 'KNIT', 'JACKET'}
+NOT_COLOR = {'AV', 'T', 'SET', 'UNISEX', 'HOODIE', 'HOODY', 'SHIRT', 'PANTS', 'TOP', 'CROP', 'TEE', 'SKIRT', 'KNIT', 'JACKET',
+             'BLOUSE', 'MTM', 'DRESS', 'VEST', 'COAT', 'CD', 'OPS', 'BAG', 'CAP', 'BEANIE', 'SHORTS', 'HOOD', 'ZIP-UP', 'T-SHIRT',
+             'CARDIGAN', 'SLACKS', 'JUMPER', 'SWEATSHIRT', 'SLEEVELESS', 'LONG', 'SHORT', 'SLEEVE'}
 _COL_TAIL = re.compile(r'[\s_\-]*\(?\d+\s*COL(OR)?S?\)?(\(N\))?\s*$', re.I)
 
 

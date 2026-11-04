@@ -178,9 +178,117 @@ def apply_search(search_text, out_dir, log=_console, caps=None):
     return P['report']
 
 
+# ================================================================== 29CM
+def _paths_29cm(out_dir):
+    work = os.path.join(out_dir, 'work_29cm')
+    os.makedirs(work, exist_ok=True)
+    today = datetime.date.today().strftime('%Y%m%d')
+    return {
+        'work': work,
+        'state': os.path.join(work, 'match.pkl'),
+        'meta': os.path.join(work, 'meta.json'),
+        'option_report': os.path.join(out_dir, f'29CM_옵션재고점검_{today}.xlsx'),
+        'report': os.path.join(out_dir, f'29CM_검색노출점검_{today}.xlsx'),
+        'cap': os.path.join(out_dir, '29CM_미노출_캡처'),
+    }
+
+
+def prepare_29cm(cm_paths, sellmate_path, out_dir, log=_console):
+    """29CM 옵션재고 일괄변경 파일(여러 개) + 셀메이트 재고목록 → 29CM_옵션재고점검 엑셀 + 검색 목록"""
+    import pickle, shutil
+    import cm29_match as cm, cm29_search as cs
+    if isinstance(cm_paths, str):
+        cm_paths = [p.strip() for p in cm_paths.split(';') if p.strip()]
+    cm_paths = [p for p in cm_paths if p]
+    missing = [p for p in cm_paths if not os.path.exists(p)]
+    if not cm_paths or missing:
+        raise FileNotFoundError('29CM 옵션재고 일괄변경 파일을 선택해 주세요.' + (f'\n없는 파일: {missing[0]}' if missing else ''))
+    if not sellmate_path or not os.path.exists(sellmate_path):
+        raise FileNotFoundError('셀메이트 재고목록 파일(stk_stockList_*.csv)을 선택해 주세요.')
+    cfg.load_settings()
+    P = _paths_29cm(out_dir)
+    log(f'브랜드: {cfg.BRAND_KR}  (29CM)')
+    log(f'1/4 29CM 파일 {len(cm_paths)}개 읽는 중 ...')
+    a, dup = cm.read_29cm(cm_paths)
+    log(f'      옵션 {len(a):,}줄, 상품 {a["상품 번호"].nunique():,}개' + (f' (겹친 옵션 {dup:,}줄은 한 번만)' if dup else ''))
+    s = cm.read_sellmate(sellmate_path, cfg.TARGET_CODE_PATTERN)
+    log(f'      셀메이트 옵션 {len(s):,}줄')
+    log('2/4 상품명으로 셀메이트 상품 찾고 옵션(컬러·사이즈) 대조 중 ... (1분 정도)')
+    R, A, res = cm.match(a, s, log=log)
+    src = f'29CM 파일 {len(cm_paths)}개 × {os.path.basename(sellmate_path)}'
+    with open(P['state'], 'wb') as f:
+        pickle.dump((R, A, res, s), f)
+    meta = {'source': src, 'brand': cfg.BRAND_KR, 'files': [os.path.abspath(p) for p in cm_paths],
+            'sellmate_path': os.path.abspath(sellmate_path)}
+    with open(P['meta'], 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False)
+    log('3/4 옵션 재고 점검 엑셀 작성 중 ...')
+    cm.write_report(R, A, res, s, P['option_report'], src)
+    vc = R['판정'].value_counts()
+    log(f'      셀메이트 재고 있는데 29CM 품절 {int(vc.get(cm.JUDGE_ORDER[0], 0)):,}개 / 판매중지 {int(vc.get(cm.JUDGE_ORDER[1], 0)):,}개 (옵션)')
+    log(f'      → {os.path.basename(P["option_report"])}')
+    # 새 파일로 다시 점검: 이전 검색 진행 기록·캡처 초기화
+    pp = os.path.join(P['work'], 'ui_progress.json')
+    if os.path.exists(pp):
+        os.remove(pp)
+    if os.path.isdir(P['cap']):
+        shutil.rmtree(P['cap'], ignore_errors=True)
+    L = cs.make_listings(R)
+    L.to_pickle(os.path.join(P['work'], 'listings.pkl'))
+    log(f'4/4 검색 목록: 판매중 상품 {len(L):,}개, 검색어 {L["검색어"].nunique():,}개')
+    cs.write_report(cs.judge(L, {}), P['report'], cfg.BRAND_KR, src)
+    log(f'옵션 재고 점검 완료 → {os.path.basename(P["option_report"])}')
+    return P
+
+
+def auto_search_29cm(out_dir, log=_console, stop=None, progress=None, chrome_path=None, headless=False, base=None):
+    """크롬을 띄워 29CM 검색창에 직접 검색 → 29CM_검색노출점검 엑셀 + 옵션 점검 엑셀에 검색 결과 반영"""
+    import pickle
+    import cm29_match as cm, cm29_search as cs
+    P = _paths_29cm(out_dir)
+    lp = os.path.join(P['work'], 'listings.pkl')
+    if not os.path.exists(lp):
+        raise FileNotFoundError('먼저 29CM 옵션 재고 점검(▶ 점검 시작)을 실행해 주세요.')
+    L = pandas.read_pickle(lp)
+    with open(P['meta'], encoding='utf-8') as f:
+        meta = json.load(f)
+    log('29CM 자동 검색: 크롬을 띄웁니다. 검색이 끝날 때까지 그 크롬 창은 건드리지 말아 주세요 (최소화는 괜찮습니다).')
+    kw = dict(log=log, stop=stop, progress=progress, chrome_path=chrome_path, headless=headless)
+    if base:
+        kw['base'] = base
+    found = cs.run(L, meta['brand'], out_dir, **kw)
+    S = cs.judge(L, found)
+    cs.write_report(S, P['report'], meta['brand'], meta['source'])
+    n_cap = int((S['캡처'] != '').sum())
+    if n_cap:
+        log(f'검색 안 된 상품 화면 캡처 {n_cap:,}개 → {P["cap"]}')
+    with open(P['state'], 'rb') as f:
+        R, A, res, s = pickle.load(f)
+    cm.write_report(R, A, res, s, P['option_report'], meta['source'], search=S.set_index('29CM 상품번호'))
+    n_ok = int(S['검색여부'].str.startswith('검색됨').sum()); n_miss = int((S['검색여부'] == '검색 안 됨').sum())
+    n_unk = int((S['검색여부'] == '미확인').sum())
+    log(f'검색됨 {n_ok:,}개 / 검색 안 됨 {n_miss:,}개' + (f' / 미확인 {n_unk:,}개' if n_unk else ''))
+    log(f'결과 엑셀: {P["report"]}')
+    log(f'          {P["option_report"]}')
+    return P['report']
+
+
 def main():
-    """명령줄: python app/runner.py <재고관리_복사본.xlsx> <셀메이트_재고목록.csv> [결과폴더] [검색결과.txt | --auto]"""
+    """명령줄: python app/runner.py <재고관리_복사본.xlsx> <셀메이트_재고목록.csv> [결과폴더] [검색결과.txt | --auto]
+       29CM : python app/runner.py --29cm <29CM파일1.xlsx;29CM파일2.xlsx;...> <셀메이트_재고목록.csv> [결과폴더] [--auto]"""
     a = sys.argv[1:]
+    if a and a[0] == '--29cm':
+        if len(a) < 3:
+            print(main.__doc__); sys.exit(1)
+        out = os.path.abspath(a[3]) if len(a) > 3 else os.path.join(cfg.ROOT, 'output')
+        try:
+            P = prepare_29cm([os.path.abspath(p) for p in a[1].split(';') if p], os.path.abspath(a[2]), out)
+            if len(a) > 4 and a[4] == '--auto':
+                auto_search_29cm(out)
+            print(' → 옵션 재고 점검:', P['option_report'])
+        except Exception:
+            traceback.print_exc(); sys.exit(1)
+        return
     if len(a) < 2:
         print(main.__doc__); sys.exit(1)
     out = os.path.abspath(a[2]) if len(a) > 2 else os.path.join(cfg.ROOT, 'output')

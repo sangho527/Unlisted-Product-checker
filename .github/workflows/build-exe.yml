@@ -3,7 +3,7 @@ name: Build Windows exe
 on:
   push:
     branches: [main]
-    paths: ['app/**', 'src/**', 'search/**', 'tests/**', 'config.py', 'musinsa_checker.spec', '.github/workflows/build-exe.yml']
+    paths: ['app/**', 'src/**', 'search/**', 'tests/**', 'docs/**', 'config.py', 'musinsa_checker.spec', '.github/workflows/build-exe.yml']
   workflow_dispatch:
   release:
     types: [published]
@@ -29,16 +29,18 @@ jobs:
       - name: Build exe
         run: pyinstaller --noconfirm musinsa_checker.spec
 
-      - name: Self test (exe로 가짜 데이터 점검 + 가짜 무신사 페이지에서 크롬 자동 검색까지)
+      - name: Self test (exe로 가짜 데이터 점검 + 가짜 무신사·29CM 페이지에서 크롬 자동 검색까지)
         shell: pwsh
         env:
           PYTHONIOENCODING: utf-8
         run: |
           python tests/make_fixture.py tests/fixture
           $mock = Start-Process -FilePath python -ArgumentList 'tests/mock_musinsa.py', '8765' -PassThru
+          $mock29 = Start-Process -FilePath python -ArgumentList 'tests/mock_29cm.py', '8766' -PassThru
           Start-Sleep -Seconds 2
-          $p = Start-Process -FilePath dist/MusinsaChecker.exe -ArgumentList '--selftest', "$PWD/tests/fixture", "$PWD/selftest_out", 'http://127.0.0.1:8765' -Wait -PassThru
+          $p = Start-Process -FilePath dist/MusinsaChecker.exe -ArgumentList '--selftest', "$PWD/tests/fixture", "$PWD/selftest_out", 'http://127.0.0.1:8765', 'http://127.0.0.1:8766' -Wait -PassThru
           Stop-Process -Id $mock.Id -ErrorAction SilentlyContinue
+          Stop-Process -Id $mock29.Id -ErrorAction SilentlyContinue
           Get-Content -Encoding utf8 selftest_out/selftest.log
           Get-ChildItem selftest_out | Select-Object Name, Length
           if ($p.ExitCode -ne 0) { throw "selftest failed: $($p.ExitCode)" }

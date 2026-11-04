@@ -164,10 +164,11 @@ def write_search_script(L, brand, template_path, out_path):
 
 
 def parse_search_result(text):
-    rows = [l.strip().split('|')[:4] for l in text.replace(';', '\n').splitlines() if l.strip()]
+    rows = [l.strip().split('|')[:5] for l in text.replace(';', '\n').splitlines() if l.strip()]
     if not rows or any(len(r) < 4 for r in rows):
         raise ValueError('검색 결과 형식이 아닙니다. 무신사 콘솔에서 복사한 결과를 그대로 붙여넣어 주세요.')
-    sr = pd.DataFrame(rows, columns=['상품번호', '검색결과수', '순위', '브랜드결과수'])
+    rows = [r + [''] * (5 - len(r)) for r in rows]
+    sr = pd.DataFrame(rows, columns=['상품번호', '검색결과수', '순위', '브랜드결과수', '재검색어'])
     for c in ['검색결과수', '브랜드결과수']:
         sr[c] = pd.to_numeric(sr[c], errors='coerce').fillna(0).astype(int)
     sr['순위'] = pd.to_numeric(sr['순위'], errors='coerce')
@@ -178,15 +179,18 @@ def parse_search_result(text):
 F = 'Arial'
 H = PatternFill('solid', fgColor='1F3864'); HF = Font(name=F, bold=True, color='FFFFFF', size=10)
 DESC = PatternFill('solid', fgColor='EEF3FA')
-FILL = {'검색 안 됨': 'F8CBAD', '미확인': 'E7E6E6'}
+RETRY_LABEL = '검색됨 (UNISEX·유니섹스 빼고 재검색)'
+FILL = {'검색 안 됨': 'F8CBAD', '미확인': 'E7E6E6', RETRY_LABEL: 'FFEB9C'}
 
 
 def _note(row):
+    if row['검색여부'] == RETRY_LABEL:
+        return (f"원래 검색어로는 안 나오고, UNISEX·유니섹스를 뺀 \"{row['재검색어']}\"로 검색하면 나옴 "
+                "→ 상품명에서 UNISEX·유니섹스 제외 검토")
     if row['검색여부'] != '검색 안 됨':
         return '판매가능 재고 0 (전 옵션 품절)' if row['총합판매가능'] == 0 else ''
-    if '유니섹스' in str(row['검색어']):
-        return ("무신사 웹 검색은 검색어에 '유니섹스'가 들어가면 결과 화면이 비어 보임(사이트 전체 현상). "
-                "'유니섹스'를 빼고 검색하면 노출됨 → 상품명에서 '유니섹스' 제외 검토")
+    if re.search(r'유니섹스|unisex', str(row['검색어']), re.I):
+        return 'UNISEX·유니섹스를 빼고 다시 검색해도 안 나옴 → 무신사에서 상품 전시 상태 확인 필요'
     if row['총합판매가능'] == 0:
         return '판매가능 재고 0 (전 옵션 품절) — 품절 상품이라 검색에서 빠졌을 수 있음'
     if row['검색결과수'] == 0:
@@ -238,10 +242,11 @@ def write_report(L, sr, brand, out_path, source_name='', excluded=0):
     R = L.copy()
     if sr is not None:
         R = R.join(sr, on='상품번호')
-        R['검색여부'] = np.where(R['순위'].notna(), f'검색됨 ({brand} 브랜드 확인)',
+        R['재검색어'] = R['재검색어'].fillna('')
+        R['검색여부'] = np.where(R['순위'].notna(), np.where(R['재검색어'] != '', RETRY_LABEL, f'검색됨 ({brand} 브랜드 확인)'),
                               np.where(R['검색결과수'].notna(), '검색 안 됨', '미확인'))
     else:
-        R['검색결과수'] = np.nan; R['브랜드결과수'] = np.nan; R['순위'] = np.nan; R['검색여부'] = '미확인'
+        R['검색결과수'] = np.nan; R['브랜드결과수'] = np.nan; R['순위'] = np.nan; R['검색여부'] = '미확인'; R['재검색어'] = ''
     R['검색결과수'] = R['검색결과수'].fillna(0)
     R['검색어(브랜드 포함)'] = brand + ' ' + R['검색어']
     R['비고'] = R.apply(_note, axis=1)
@@ -249,7 +254,7 @@ def write_report(L, sr, brand, out_path, source_name='', excluded=0):
     R['상품링크'] = 'https://www.musinsa.com/products/' + R['상품번호'].astype(str)
     if '캡처' not in R.columns:
         R['캡처'] = None
-    R['_k'] = R['검색여부'].map(lambda v: 0 if v == '검색 안 됨' else (1 if v == '미확인' else 2))
+    R['_k'] = R['검색여부'].map(lambda v: 0 if v == '검색 안 됨' else (1 if v == RETRY_LABEL else (2 if v == '미확인' else 3)))
     R = R.sort_values(['_k', '총합판매가능'], ascending=[True, False])
 
     cols = ['검색여부', '상품번호', '상품명', '스타일넘버', '검색어(브랜드 포함)', '검색결과수', '브랜드결과수', '순위', '비고',
@@ -263,11 +268,11 @@ def write_report(L, sr, brand, out_path, source_name='', excluded=0):
     miss = R[R['검색여부'] == '검색 안 됨']
     _sheet(wb, '검색_미노출', miss, cols, heads, widths,
            f'[왜 만들었나] 무신사 판매중 상품인데, 무신사 검색창에 "{brand} + 상품명"을 넣었을 때 검색 결과 화면에 나오지 않는 상품만 모은 시트입니다. '
-           f'실제 작업은 이 시트부터 보시면 됩니다.\n[읽는 법] 비고에 원인(유니섹스 검색 문제, 전 옵션 품절 등)을 적었습니다. 링크를 눌러 무신사 화면에서 직접 확인할 수 있고, "캡처 보기"를 누르면 검색했을 때의 화면 캡처가 열립니다 (엑셀 파일과 미노출_캡처 폴더가 같은 폴더에 있어야 함).')
+           f'실제 작업은 이 시트부터 보시면 됩니다.\n[읽는 법] 비고에 원인(전 옵션 품절, 다른 상품만 나옴 등)을 적었습니다. UNISEX·유니섹스가 들어간 상품명은 그 단어를 빼고 한 번 더 검색한 결과입니다. 링크를 눌러 무신사 화면에서 직접 확인할 수 있고, "캡처 보기"를 누르면 검색했을 때의 화면 캡처가 열립니다 (엑셀 파일과 미노출_캡처 폴더가 같은 폴더에 있어야 함).')
     _sheet(wb, '전체_검색결과', R, cols, heads, widths,
            f'[왜 만들었나] 판매중 상품 전체의 검색 결과입니다. 검색이 안 된 상품이 맨 위에 옵니다.\n'
            f'[읽는 법] 검색어는 상품명에서 컬러명·"_3COL" 같은 컬러 묶음 표시를 뗀 이름 앞에 "{brand}"를 붙인 것입니다. '
-           f'"검색됨"은 실제 검색 결과 화면에 해당 상품번호가 브랜드 "{brand}"로 나왔다는 뜻입니다. "미확인"은 아직 브라우저 검색을 하지 않은 상품입니다.')
+           f'"검색됨"은 실제 검색 결과 화면에 해당 상품번호가 브랜드 "{brand}"로 나왔다는 뜻입니다. "{RETRY_LABEL}"은 원래 검색어로는 안 나오고 UNISEX·유니섹스를 빼고 다시 검색하니 나온 상품입니다. "미확인"은 아직 브라우저 검색을 하지 않은 상품입니다.')
     b = Font(name=F, bold=True, size=10)
     ws['A1'] = f'무신사 검색 노출 점검 — {brand} 판매중 상품'; ws['A1'].font = Font(name=F, bold=True, size=14)
     ws['A2'] = f'기준: {source_name} · 작성 {datetime.date.today():%Y-%m-%d}'; ws['A2'].font = Font(name=F, size=9, color='808080')
@@ -275,13 +280,13 @@ def write_report(L, sr, brand, out_path, source_name='', excluded=0):
     ws['A3'].font = Font(name=F, size=10, color='1F3864')
     for j, t in enumerate(['검색 결과', '상품 수'], 1):
         x = ws.cell(5, j, t); x.font = HF; x.fill = H
-    labels = [f'검색됨 ({brand} 브랜드 확인)', '검색 안 됨', '미확인']
+    labels = [f'검색됨 ({brand} 브랜드 확인)', RETRY_LABEL, '검색 안 됨', '미확인']
     for i, t in enumerate(labels, 6):
         ws.cell(i, 1, t).font = b
         ws.cell(i, 1).fill = PatternFill('solid', fgColor=FILL.get(t, 'C6EFCE'))
         ws.cell(i, 2, f"=COUNTIFS('전체_검색결과'!$A:$A,$A{i})").number_format = '#,##0'
-    ws.cell(9, 1, '합계 (판매중 상품 수)').font = b; ws.cell(9, 2, '=SUM(B6:B8)').font = b
-    r = 11
+    ws.cell(10, 1, '합계 (판매중 상품 수)').font = b; ws.cell(10, 2, '=SUM(B6:B9)').font = b
+    r = 12
     ws.cell(r, 1, '검색 안 됨 — 원인별').font = b
     if len(miss):
         for i, (k, v) in enumerate(miss['비고'].str.split(' — | →|\\(사이트').str[0].value_counts().items(), r + 1):

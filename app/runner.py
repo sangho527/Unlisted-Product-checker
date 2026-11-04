@@ -141,7 +141,8 @@ def auto_search(out_dir, log=_console, stop=None, progress=None, chrome_path=Non
     with open(P['meta'], encoding='utf-8') as f:
         meta = json.load(f)
     log('무신사 자동 검색: 크롬을 띄웁니다. 검색이 끝날 때까지 그 크롬 창은 건드리지 말아 주세요 (최소화는 괜찮습니다).')
-    kw = dict(log=log, stop=stop, progress=progress, chrome_path=chrome_path, headless=headless)
+    kw = dict(log=log, stop=stop, progress=progress, chrome_path=chrome_path, headless=headless,
+              drop_words=getattr(cfg, 'SEARCH_DROP_WORDS', ['UNISEX', '유니섹스']))
     if base:
         kw['base'] = base
     text, caps = ui_search.run(L, meta['brand'], out_dir, **kw)
@@ -253,7 +254,8 @@ def auto_search_29cm(out_dir, log=_console, stop=None, progress=None, chrome_pat
     with open(P['meta'], encoding='utf-8') as f:
         meta = json.load(f)
     log('29CM 자동 검색: 크롬을 띄웁니다. 검색이 끝날 때까지 그 크롬 창은 건드리지 말아 주세요 (최소화는 괜찮습니다).')
-    kw = dict(log=log, stop=stop, progress=progress, chrome_path=chrome_path, headless=headless)
+    kw = dict(log=log, stop=stop, progress=progress, chrome_path=chrome_path, headless=headless,
+              drop_words=getattr(cfg, 'SEARCH_DROP_WORDS', ['UNISEX', '유니섹스']))
     if base:
         kw['base'] = base
     found = cs.run(L, meta['brand'], out_dir, **kw)

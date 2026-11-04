@@ -225,14 +225,32 @@ def collect(br, targets, brand):
     return br.eval(JS_COLLECT + f'({json.dumps(list(targets))}, {json.dumps(brand)})', await_promise=True)
 
 
+DROP_WORDS = ['UNISEX', '유니섹스']
+RETRY_LABEL = '검색됨 (UNISEX·유니섹스 빼고 재검색)'
+
+
+def retry_keyword(kw, words=None, brand=''):
+    """검색어에서 words(UNISEX·유니섹스 등)를 뺀 재검색어. 뺄 단어가 없거나 상품명이 비면 None"""
+    words = words if words is not None else DROP_WORDS
+    if not words:
+        return None
+    pat = r'(?<![0-9A-Za-z가-힣])(?:' + '|'.join(re.escape(w) for w in words) + r')(?![0-9A-Za-z가-힣])'
+    k2 = re.sub(r'\s+', ' ', re.sub(pat, ' ', str(kw), flags=re.I)).strip(' -_')
+    if not k2 or k2 == str(kw).strip() or k2.strip() == str(brand).strip():
+        return None
+    return k2
+
+
 def _safe(s, n=50):
     return re.sub(r'[\\/:*?"<>|\s]+', '_', str(s)).strip('_')[:n]
 
 
-def run(L, brand, out_dir, log=print, stop=None, progress=None, chrome_path=None, headless=False, delay=0.5, base=BASE_URL):
+def run(L, brand, out_dir, log=print, stop=None, progress=None, chrome_path=None, headless=False, delay=0.5, base=BASE_URL,
+        drop_words=None):
     """
     L: 상품 목록 (상품번호, 상품명, 검색어)
-    반환: (검색결과 텍스트 '상품번호|결과수|순위|브랜드상품수' 줄들, {상품번호: 캡처 파일 상대경로})
+    반환: (검색결과 텍스트 '상품번호|결과수|순위|브랜드상품수|재검색어' 줄들, {상품번호: 캡처 파일 상대경로})
+    상품이 안 나오면 drop_words(UNISEX·유니섹스 등)를 뺀 검색어로 한 번 더 검색합니다.
     작업 중 결과는 work/ui_progress.json 에 저장해, 중간에 멈춰도 다시 누르면 이어서 합니다.
     """
     work = os.path.join(out_dir, 'work'); cap_dir = os.path.join(out_dir, '미노출_캡처')
@@ -280,6 +298,28 @@ def run(L, brand, out_dir, log=print, stop=None, progress=None, chrome_path=None
                     rec['rank'][no] = ids.index(no) + 1
                 else:
                     miss.append((no, name))
+            rec['retry'] = {}
+            kw2 = retry_keyword(kw, drop_words, brand) if miss else None
+            if kw2:
+                try:
+                    search_once(br, kw2, base); r2 = collect(br, [no for no, _ in miss], brand)
+                except Exception as e:
+                    log(f'  [{kw2}] 재검색 오류: {e}'); r2 = None
+                if r2:
+                    for it in r2['items']:
+                        if it['bt'] and it['slug']:
+                            slugs.add(it['slug'])
+                    ours2 = [it for it in r2['items'] if it['bt'] or (it['slug'] and it['slug'] in slugs)]
+                    ids2 = [it['id'] for it in r2['items']]
+                    tot2 = r2['shown'] if r2['shown'] is not None else (0 if r2['empty'] else len(r2['items']))
+                    still = []
+                    for no, name in miss:
+                        if any(it['id'] == no for it in ours2):
+                            rec['rank'][no] = ids2.index(no) + 1
+                            rec['retry'][no] = {'kw': kw2, 'total': tot2, 'ours': len(ours2)}
+                        else:
+                            still.append((no, name))
+                    miss = still
             if miss:
                 p = os.path.join(cap_dir, f'{miss[0][0]}_{_safe(miss[0][1])}.png')
                 br.screenshot(p)
@@ -307,7 +347,11 @@ def run(L, brand, out_dir, log=print, stop=None, progress=None, chrome_path=None
         if not rec:
             continue
         for no, _ in items:
-            lines.append(f"{no}|{rec['total']}|{rec['rank'].get(no, '')}|{rec['ours']}")
+            rt = rec.get('retry', {}).get(no)
+            if rt:
+                lines.append(f"{no}|{rt['total']}|{rec['rank'].get(no, '')}|{rt['ours']}|{rt['kw']}")
+            else:
+                lines.append(f"{no}|{rec['total']}|{rec['rank'].get(no, '')}|{rec['ours']}")
             if no in rec['cap']:
                 caps[no] = rec['cap'][no]
     return '\n'.join(lines), caps

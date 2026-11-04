@@ -27,6 +27,9 @@ BRAND_KR = '어반드레스'
 TARGET_CODE_PATTERN  = r'^(AD|AV|\d{2}(SS|FW)AD)'
 # 같은 무신사 스토어에 섞여 있지만 이번 점검에서 제외할 다른 브랜드 (젠더스트 ZD, 비바셔스 VV)
 EXCLUDE_CODE_PATTERN = r'^(ZD|VV)'
+# 검색했는데 상품이 안 나오면 이 단어들을 빼고 한 번 더 검색 (모든 판매채널 공통)
+#   예: 'UNISEX AV OVERSIZED HOODIE' → 안 나오면 'AV OVERSIZED HOODIE'로 재검색
+SEARCH_DROP_WORDS = ['UNISEX', '유니섹스']
 
 # ---- 사람이 확인한 수동 연결 ----
 # 무신사 스타일넘버가 잘못 입력돼 상품명으로도 자동 연결이 안 되는 상품 (한글/영문 상품명이 서로 다른 경우)
@@ -55,7 +58,7 @@ def fname(p):
 
 # ---- settings.json (선택) ----
 # exe 사용자가 코드 수정 없이 브랜드·제외 규칙·수동 연결을 바꿀 수 있도록, ROOT/settings.json 이 있으면 덮어씁니다.
-SETTINGS_KEYS = ['BRAND_KR', 'TARGET_CODE_PATTERN', 'EXCLUDE_CODE_PATTERN', 'MANUAL_LINKS',
+SETTINGS_KEYS = ['BRAND_KR', 'TARGET_CODE_PATTERN', 'EXCLUDE_CODE_PATTERN', 'SEARCH_DROP_WORDS', 'MANUAL_LINKS',
                  'MANUAL_SHORT_LINKS', 'LISTING_NOTES', 'SELLMATE_NOTES']
 SETTINGS_FILE = os.path.join(ROOT, 'settings.json')
 

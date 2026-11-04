@@ -303,10 +303,11 @@ class App(tk.Tk):
 
     def open_settings(self):
         if not os.path.exists(cfg.SETTINGS_FILE):
-            cfg.save_settings(keys=['BRAND_KR', 'EXCLUDE_CODE_PATTERN'])
+            cfg.save_settings(keys=['BRAND_KR', 'EXCLUDE_CODE_PATTERN', 'SEARCH_DROP_WORDS'])
         messagebox.showinfo(APP_TITLE, '설정 파일(settings.json)을 엽니다.\n\n'
                             'BRAND_KR: 무신사·29CM에 표시되는 브랜드명 (검색어 앞에 붙고, 검색 결과의 브랜드를 이 이름으로 확인)\n'
-                            'EXCLUDE_CODE_PATTERN: 점검에서 뺄 스타일넘버 규칙 (예: ^(ZD|VV) = ZD·VV로 시작하는 상품 제외)\n\n'
+                            'EXCLUDE_CODE_PATTERN: 점검에서 뺄 스타일넘버 규칙 (예: ^(ZD|VV) = ZD·VV로 시작하는 상품 제외)\n'
+                            'SEARCH_DROP_WORDS: 검색해서 안 나오면 빼고 다시 검색할 단어 (기본: UNISEX, 유니섹스)\n\n'
                             '저장한 뒤 [▶ 점검 시작]부터 다시 실행하면 반영됩니다.')
         open_path(cfg.SETTINGS_FILE)
 
@@ -361,7 +362,7 @@ def selftest_29cm(fixture_dir, out_dir, log, auto_base=None):
     O = pd.read_excel(P['option_report'], '옵션별_대조', header=1, dtype=str)
     j = {(a, b): c for a, b, c in zip(O['29CM 상품명'], O['29CM 옵션명'], O['판정'])}
     log(f'29CM 옵션 판정: {j}')
-    ok = len(O) == 6 and j.get(('Test Crop Tee_2Colors', '[색상]BLACK [사이즈]M')) == '셀메이트 재고 있는데 29CM 품절' \
+    ok = len(O) == 7 and j.get(('Test Crop Tee_2Colors', '[색상]BLACK [사이즈]M')) == '셀메이트 재고 있는데 29CM 품절' \
         and j.get(('테스트 와이드 팬츠 BLUE', '[사이즈]S')) == '셀메이트 재고 있는데 29CM 판매중지'
     if ok and auto_base:
         report = runner.auto_search_29cm(out, log=log, headless=True, base=auto_base)
@@ -369,6 +370,7 @@ def selftest_29cm(fixture_dir, out_dir, log, auto_base=None):
         st = dict(zip(R['29CM 상품번호'], R['검색여부']))
         log(f'29CM 자동 검색 결과: {st}')
         ok = st.get('3000001') == '검색됨' and st.get('3000002') == '검색 안 됨' and st.get('3000003', '').startswith('검색됨') \
+            and 'UNISEX' in st.get('3000004', '') \
             and os.path.exists(os.path.join(out, '29CM_미노출_캡처'))
     log('29CM ' + ('OK' if ok else 'FAIL'))
     return ok
@@ -394,6 +396,7 @@ def selftest(fixture_dir, out_dir, auto_base=None, auto_base_29cm=None):
                 st = dict(zip(R.iloc[:, 1], R.iloc[:, 0]))
                 log(f'자동 검색 결과: {st}')
                 ok = st.get('9000001', '').startswith('검색됨') and st.get('9000002') == '검색 안 됨' \
+                    and 'UNISEX' in st.get('9000003', '') \
                     and os.path.exists(os.path.join(out, '미노출_캡처'))
             if ok:   # 셀메이트 재고 5인데 무신사 품절인 9000001 BLACK^M 이 잡혀야 함
                 import pandas as pd

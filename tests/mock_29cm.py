@@ -11,6 +11,8 @@ BRAND = '어반드레스'
 DB = {
     '어반드레스 Test Crop Tee': [('3000001', BRAND, 'Test Crop Tee_2Colors', False), ('8000001', '다른브랜드', 'Crop Tee', False)],
     '어반드레스 테스트 와이드 팬츠': [('8000002', '다른브랜드', '와이드 팬츠', False)],          # 우리 상품 안 나옴
+    '어반드레스 UNISEX Test Hoodie': [],                                                          # 결과 없음
+    '어반드레스 Test Hoodie': [('3000004', BRAND, 'UNISEX Test Hoodie - 2COL', False)],           # UNISEX 빼고 재검색하면 나옴
     '어반드레스 Test Mini Skirt': [(str(7000000 + i), BRAND, f'Other Skirt {i}', False) for i in range(40)]
                                 + [('3000003', BRAND, 'Test Mini Skirt BLACK', True)],          # 41번째, 품절 표시
 }

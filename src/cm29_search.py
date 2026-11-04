@@ -12,7 +12,7 @@
 import os, re, json, time, shutil, urllib.parse
 import pandas as pd
 
-from ui_search import Browser, _safe
+from ui_search import Browser, _safe, retry_keyword, RETRY_LABEL
 import search_check as sc
 from cm29_match import write_sheet, F_NAME, PRODUCT_URL
 from openpyxl import Workbook
@@ -134,8 +134,9 @@ def make_listings(R):
 
 # ------------------------------------------------------------------ 자동 검색
 def run(L, brand, out_dir, log=print, stop=None, progress=None, chrome_path=None, headless=False, delay=0.5, base=BASE_URL,
-        work_name='work_29cm', cap_name='29CM_미노출_캡처'):
-    """반환: {상품번호: {total, rank, ours, empty, soldout, cap, seen}}  (중간에 멈춰도 다시 누르면 이어서)"""
+        work_name='work_29cm', cap_name='29CM_미노출_캡처', drop_words=None):
+    """반환: {상품번호: {total, rank, ours, empty, soldout, cap, seen, retry}}  (중간에 멈춰도 다시 누르면 이어서)
+    상품이 안 나오면 drop_words(UNISEX·유니섹스 등)를 뺀 검색어로 한 번 더 검색합니다."""
     work = os.path.join(out_dir, work_name); cap_dir = os.path.join(out_dir, cap_name)
     os.makedirs(work, exist_ok=True); os.makedirs(cap_dir, exist_ok=True)
     prog_path = os.path.join(work, 'ui_progress.json')
@@ -181,6 +182,31 @@ def run(L, brand, out_dir, log=print, stop=None, progress=None, chrome_path=None
                             rec['soldout'][no] = True
                     else:
                         miss.append((no, name))
+                rec['retry'] = {}
+                kw2 = retry_keyword(kw, drop_words, brand) if miss else None
+                if kw2:
+                    try:
+                        search_once(br, kw2, base); r2 = collect(br, brand)
+                    except Exception as e:
+                        log(f'  [{kw2}] 재검색 오류: {e}'); r2 = None
+                    if r2:
+                        for it in r2['items']:
+                            if it['bt'] and it['brandId']:
+                                brand_ids.add(it['brandId'])
+                        ours2 = [it for it in r2['items'] if it['bt'] or (it['brandId'] and it['brandId'] in brand_ids)]
+                        ids2 = [it['id'] for it in r2['items']]
+                        tot2 = r2['total'] if r2['total'] is not None else len(r2['items'])
+                        still = []
+                        for no, name in miss:
+                            hit = next((it for it in ours2 if it['id'] == no), None)
+                            if hit:
+                                rec['rank'][no] = ids2.index(no) + 1
+                                rec['retry'][no] = {'kw': kw2, 'total': tot2}
+                                if hit['soldout']:
+                                    rec['soldout'][no] = True
+                            else:
+                                still.append((no, name))
+                        miss = still
                 if miss:
                     p = os.path.join(cap_dir, f'{miss[0][0]}_{_safe(miss[0][1])}.png')
                     br.screenshot(p)
@@ -208,7 +234,9 @@ def run(L, brand, out_dir, log=print, stop=None, progress=None, chrome_path=None
         if not rec:
             continue
         for no, _ in items:
-            out[no] = {'검색어': kw, 'total': rec['total'], 'rank': rec['rank'].get(no), 'ours': rec['ours'],
+            rt = rec.get('retry', {}).get(no)
+            out[no] = {'검색어': kw, 'total': rt['total'] if rt else rec['total'], 'rank': rec['rank'].get(no), 'ours': rec['ours'],
+                       'retry': rt['kw'] if rt else '',
                        'soldout': rec.get('soldout', {}).get(no, False), 'cap': rec['cap'].get(no), 'seen': ' / '.join(rec['seen'][:5])}
     return out
 
@@ -220,6 +248,10 @@ def judge(L, found):
         f = found.get(r['상품번호'])
         if not f:
             st, note = '미확인', '아직 검색 안 함'
+        elif f['rank'] and f.get('retry'):
+            st = RETRY_LABEL
+            note = (f'원래 검색어로는 안 나오고, UNISEX·유니섹스를 뺀 "{f["retry"]}"로 검색하면 나옴 → 상품명에서 UNISEX·유니섹스 제외 검토'
+                    + (' (카드에 "품절" 표시)' if f['soldout'] else ''))
         elif f['rank']:
             st = '검색됨' + (' (품절 표시)' if f['soldout'] else '')
             note = '검색 결과에는 나오지만 카드에 "품절"로 표시됨' if f['soldout'] else ''
@@ -234,7 +266,7 @@ def judge(L, found):
             else:
                 note = '검색 결과에 우리 브랜드의 다른 상품만 나옴 → 29CM 전시 상태 확인 필요'
         rows.append({'검색여부': st, '29CM 상품번호': r['상품번호'], '29CM 상품명': r['상품명'],
-                     '검색어': (f or {}).get('검색어', ''), '검색 결과 수': (f or {}).get('total'),
+                     '검색어': (f or {}).get('검색어', ''), '재검색어': (f or {}).get('retry', ''), '검색 결과 수': (f or {}).get('total'),
                      '화면 순위': (f or {}).get('rank'), '판매중 옵션 수': r['판매중옵션수'], '옵션 수': r['옵션수'],
                      '29CM 재고 합': r['29CM재고'], '셀메이트 재고 합': r['셀메이트재고'], '비고': note,
                      '검색 결과 앞쪽 상품': (f or {}).get('seen', ''),
@@ -244,7 +276,7 @@ def judge(L, found):
 
 
 def write_report(S, out_path, brand, source_label):
-    order = {'검색 안 됨': 0, '검색됨 (품절 표시)': 1, '미확인': 2, '검색됨': 3}
+    order = {'검색 안 됨': 0, RETRY_LABEL: 1, '검색됨 (품절 표시)': 2, '미확인': 3, '검색됨': 4}
     S = S.assign(_o=S['검색여부'].map(order)).sort_values(['_o', '셀메이트 재고 합'], ascending=[True, False]).drop(columns='_o')
     wb = Workbook(); wb.remove(wb.active)
     ws = wb.create_sheet('요약')
@@ -260,16 +292,17 @@ def write_report(S, out_path, brand, source_label):
     for t in ['· 검색됨: 검색 결과 화면에 그 상품번호가 우리 브랜드(카드의 브랜드명)로 나옴',
               '· 검색 안 됨: 결과 화면 첫 페이지에 그 상품이 없음 → "캡처 보기"로 화면 확인',
               '· 확인 범위: 로그인하지 않은 29CM 웹 검색, 추천순 첫 페이지. 앱·카테고리·브랜드관 노출은 확인하지 않습니다.',
-              '· 같은 검색어(예: 컬러별로 따로 등록된 상품)는 한 번만 검색합니다.']:
+              '· 같은 검색어(예: 컬러별로 따로 등록된 상품)는 한 번만 검색합니다.',
+              f'· {RETRY_LABEL}: 원래 검색어로는 안 나와서 UNISEX·유니섹스를 빼고 다시 검색하니 나온 상품 (재검색어 열 참고).']:
         ws.cell(r, 1, t).font = Font(name=F_NAME, size=10); r += 1
     ws.column_dimensions['A'].width = 70; ws.column_dimensions['B'].width = 12
-    W = [14, 12, 42, 40, 9, 8, 9, 7, 9, 9, 44, 50, 10, 10, 10]
+    W = [22, 12, 42, 40, 34, 9, 8, 9, 7, 9, 9, 44, 50, 10, 10, 10]
     links = {'검색 링크': '검색 열기', '캡처': '캡처 보기'}
     write_sheet(wb, '검색_미노출', S[S['검색여부'] == '검색 안 됨'],
                 '29CM 판매중 상품 중, "브랜드명 + 상품명"으로 검색했을 때 결과 화면에 안 나오는 상품입니다. 작업은 이 시트부터 보시면 됩니다.\n'
                 '"캡처 보기"로 검색했을 때의 화면을, "검색 열기"로 지금 검색 결과를 볼 수 있습니다. 셀메이트 재고가 많은 순.',
                 W, extra_links=links)
     write_sheet(wb, '전체_검색결과', S,
-                '판매중 상품 전체의 검색 결과. 검색 안 됨 → 검색됨(품절 표시) → 미확인 → 검색됨 순.', W, extra_links=links)
+                '판매중 상품 전체의 검색 결과. 검색 안 됨 → 재검색으로 검색됨 → 검색됨(품절 표시) → 미확인 → 검색됨 순.', W, extra_links=links)
     wb.save(out_path)
     return S

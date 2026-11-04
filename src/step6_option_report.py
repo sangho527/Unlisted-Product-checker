@@ -63,12 +63,12 @@ sheet('옵션별_점검',r,c1,h1,[30,11,38,22,20,36,14,9,10,10,10,12,16,9,30,38,
 import os
 HAS_SEARCH=os.path.exists(cfg.SEARCH_RESULT)
 if HAS_SEARCH:
-    SR=pd.DataFrame([x.strip().split('|')[:4] for x in open(cfg.SEARCH_RESULT,encoding='utf-8').read().replace('\n',';').split(';') if x.strip()],
-                    columns=['상품번호','검색결과수','순위','브랜드결과수'])
+    SR=pd.DataFrame([(x.strip().split('|')+['']*5)[:5] for x in open(cfg.SEARCH_RESULT,encoding='utf-8').read().replace('\n',';').split(';') if x.strip()],
+                    columns=['상품번호','검색결과수','순위','브랜드결과수','재검색어'])
     SR['검색결과수']=pd.to_numeric(SR['검색결과수'],errors='coerce').fillna(0).astype(int)
     SR['브랜드결과수']=pd.to_numeric(SR['브랜드결과수'],errors='coerce').fillna(0).astype(int)
     SR['순위']=pd.to_numeric(SR['순위'],errors='coerce')
-    SR['검색여부']=np.where(SR['순위'].notna(),f'검색됨 ({cfg.BRAND_KR} 브랜드 확인)','검색 안 됨')
+    SR['검색여부']=np.where(SR['순위'].notna(),np.where(SR['재검색어']!='','검색됨 (UNISEX·유니섹스 빼고 재검색)',f'검색됨 ({cfg.BRAND_KR} 브랜드 확인)'),'검색 안 됨')
     SRm=SR.set_index('상품번호')
 else:
     SRm=pd.DataFrame()
@@ -78,7 +78,9 @@ def search_label(lid):
     lid=str(lid)
     if not HAS_SEARCH or lid not in SRm.index: return '미확인'
     x=SRm.loc[lid]
-    return x['검색여부'] if pd.isna(x['순위']) else f"검색됨 ({x['검색결과수']}건 중 {int(x['순위'])}위)"
+    if pd.isna(x['순위']): return x['검색여부']
+    if x['재검색어']: return f"검색됨 (UNISEX·유니섹스 빼고 재검색: {x['검색결과수']}건 중 {int(x['순위'])}위)"
+    return f"검색됨 ({x['검색결과수']}건 중 {int(x['순위'])}위)"
 # 3) 상품별 한눈에 보기 (무신사 상품번호 1개 = 1줄)
 import re as _re
 def opt_text(d,val=None,fmt='{}'):
@@ -139,9 +141,11 @@ if HAS_SEARCH:
     S['검색링크']='https://www.musinsa.com/search/goods?keyword='+S['검색어'].map(lambda v: quote(str(v)))
     S['상품링크']='https://www.musinsa.com/products/'+S['상품번호']
     def _note(row):
+        if str(row['검색여부']).startswith('검색됨 (UNISEX'):
+            return f"원래 검색어로는 안 나오고 \"{row['재검색어']}\"(UNISEX·유니섹스 제외)로 검색하면 나옴 → 상품명에서 UNISEX·유니섹스 제외 검토"
         if row['검색여부']!='검색 안 됨': return ''
-        if '유니섹스' in str(row['검색어']):
-            return "무신사 웹 검색은 검색어에 '유니섹스'가 들어가면 결과 화면이 비어 보임(사이트 전체 현상, '유니섹스'만 검색해도 동일). '유니섹스'를 빼고 검색하면 노출됨 → 상품명에서 '유니섹스' 제외 검토"
+        if _re.search(r'유니섹스|unisex',str(row['검색어']),_re.I):
+            return 'UNISEX·유니섹스를 빼고 다시 검색해도 안 나옴 → 무신사 상품 노출 상태 확인 필요'
         return '검색 결과 화면에 해당 상품이 없음 → 무신사 상품 노출 상태 확인 필요'
     S['비고']=S.apply(_note,axis=1)
     S['_k']=S['검색여부'].map(lambda v: 0 if v=='검색 안 됨' else (1 if v=='미확인' else 2))

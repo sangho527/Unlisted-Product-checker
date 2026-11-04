@@ -44,6 +44,7 @@ sm('AV99PT01BL', '테스트 와이드 팬츠 BLUE', [('S', 3), ('M', 4)], sale='
 sm('AV99CT01BK', '유니섹스 테스트 롱 코트 블랙', [('FREE', 5)])
 sm('AV99SK01BK', 'Test Mini Skirt BLACK', [('S', 0)])
 sm('ZD99TS01BK', 'Other Brand Tee BLACK', [('S', 1)])
+sm('AV99TS02BK', 'UNISEX Test Hoodie BLACK', [('M', 3)])                # 29CM: UNISEX 빼고 재검색
 with open(os.path.join(out, 'sellmate_stock.csv'), 'w', encoding='cp949', newline='') as f:
     f.write(','.join(f'"{c}"' for c in S_COLS) + ',\n')
     for r in srows:
@@ -65,7 +66,8 @@ p1 = [r29('3000001', 'Test Crop Tee_2Colors', '1', '[색상]BLACK [사이즈]S',
       r29('3000002', '테스트 와이드 팬츠 BLUE', '4', '[사이즈]S', '판매중지', 0)]                 # 셀메이트 3개 → ②
 p2 = [r29('3000002', '테스트 와이드 팬츠 BLUE', '4', '[사이즈]S', '판매중지', 0),                 # 1페이지와 겹침
       r29('3000002', '테스트 와이드 팬츠 BLUE', '5', '[사이즈]M', '판매중', 4),
-      r29('3000003', 'Test Mini Skirt BLACK', '6', '[사이즈]S', '판매중', 2)]                       # 셀메이트 0 → ④
+      r29('3000003', 'Test Mini Skirt BLACK', '6', '[사이즈]S', '판매중', 2),                       # 셀메이트 0 → ④
+      r29('3000004', 'UNISEX Test Hoodie - 2COL', '7', '[색상]BLACK [사이즈]M', '판매중', 3)]       # UNISEX 빼고 재검색하면 검색됨
 for fn, rows_ in [('cm29_page1.xlsx', p1), ('cm29_page2.xlsx', p2)]:
     top = [['[자동 입력 / 수정 불가]'] * len(C29), ['기존 정보 확인'] + [None] * (len(C29) - 1), C29]
     pd.DataFrame(top + rows_).to_excel(os.path.join(out, fn), index=False, header=False, sheet_name='옵션')

@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runner  # noqa: E402
 cfg = runner.cfg
 
-APP_TITLE = '판매중 상품 점검 (무신사 · 29CM)'
+APP_TITLE = '판매채널 상품 점검 (무신사 · 29CM)'
 PLATFORMS = ('무신사', '29CM')
 FONT = ('맑은 고딕', 10)
 FONT_B = ('맑은 고딕', 10, 'bold')
@@ -375,7 +375,7 @@ def selftest_29cm(fixture_dir, out_dir, log, auto_base=None):
 
 
 def selftest(fixture_dir, out_dir, auto_base=None, auto_base_29cm=None):
-    """화면 없이 실행 (빌드 확인용): MusinsaChecker.exe --selftest <입력폴더> <결과폴더> [가짜 무신사 주소] [가짜 29CM 주소]"""
+    """화면 없이 실행 (빌드 확인용): SalesChannelChecker.exe --selftest <입력폴더> <결과폴더> [가짜 무신사 주소] [가짜 29CM 주소]"""
     os.makedirs(out_dir, exist_ok=True)
     logf = open(os.path.join(out_dir, 'selftest.log'), 'w', encoding='utf-8')
     log = lambda m: (logf.write(m + '\n'), logf.flush())

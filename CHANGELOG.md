@@ -5,6 +5,15 @@
 
 ---
 
+## 이름 통합 — Sales Channel Checker (2026-11-04)
+
+### v16.1
+- 무신사 외 다른 판매채널도 계속 추가하므로 이름을 통합: 레포 `Sales-Channel-Checker`, 실행 파일 `SalesChannelChecker.exe`,
+  화면 제목 "판매채널 상품 점검", 빌드 설정 `sales_channel_checker.spec`, 다운로드 파일 `SalesChannelChecker-windows.zip`.
+  기능은 v16과 같습니다.
+
+---
+
 ## 29CM 점검 추가 — `29CM_옵션재고점검_*.xlsx`, `29CM_검색노출점검_*.xlsx` (2026-11-04)
 
 입력: 29CM 옵션재고 일괄변경(파트너) 파일 여러 개(페이지별) + 셀메이트 재고목록

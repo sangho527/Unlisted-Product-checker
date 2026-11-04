@@ -1,5 +1,5 @@
-# PyInstaller 설정 — Windows exe 빌드용 (GitHub Actions: .github/workflows/build-exe.yml)
-#   pyinstaller musinsa_checker.spec
+# PyInstaller 설정 — 판매채널 상품 점검 Windows exe 빌드용 (GitHub Actions: .github/workflows/build-exe.yml)
+#   pyinstaller sales_channel_checker.spec
 import os
 block_cipher = None
 ROOT = os.path.abspath('.')
@@ -15,7 +15,7 @@ a = Analysis(
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [],
-    name='MusinsaChecker',
+    name='SalesChannelChecker',
     console=False,
     upx=False,
 )

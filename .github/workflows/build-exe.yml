@@ -3,7 +3,7 @@ name: Build Windows exe
 on:
   push:
     branches: [main]
-    paths: ['app/**', 'src/**', 'search/**', 'tests/**', 'docs/**', 'config.py', 'musinsa_checker.spec', '.github/workflows/build-exe.yml']
+    paths: ['app/**', 'src/**', 'search/**', 'tests/**', 'docs/**', 'config.py', 'sales_channel_checker.spec', '.github/workflows/build-exe.yml']
   workflow_dispatch:
   release:
     types: [published]
@@ -27,7 +27,7 @@ jobs:
           pip install -r requirements.txt pyinstaller
 
       - name: Build exe
-        run: pyinstaller --noconfirm musinsa_checker.spec
+        run: pyinstaller --noconfirm sales_channel_checker.spec
 
       - name: Self test (exe로 가짜 데이터 점검 + 가짜 무신사·29CM 페이지에서 크롬 자동 검색까지)
         shell: pwsh
@@ -38,7 +38,7 @@ jobs:
           $mock = Start-Process -FilePath python -ArgumentList 'tests/mock_musinsa.py', '8765' -PassThru
           $mock29 = Start-Process -FilePath python -ArgumentList 'tests/mock_29cm.py', '8766' -PassThru
           Start-Sleep -Seconds 2
-          $p = Start-Process -FilePath dist/MusinsaChecker.exe -ArgumentList '--selftest', "$PWD/tests/fixture", "$PWD/selftest_out", 'http://127.0.0.1:8765', 'http://127.0.0.1:8766' -Wait -PassThru
+          $p = Start-Process -FilePath dist/SalesChannelChecker.exe -ArgumentList '--selftest', "$PWD/tests/fixture", "$PWD/selftest_out", 'http://127.0.0.1:8765', 'http://127.0.0.1:8766' -Wait -PassThru
           Stop-Process -Id $mock.Id -ErrorAction SilentlyContinue
           Stop-Process -Id $mock29.Id -ErrorAction SilentlyContinue
           Get-Content -Encoding utf8 selftest_out/selftest.log
@@ -49,18 +49,18 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force pkg | Out-Null
-          Copy-Item dist/MusinsaChecker.exe pkg/
+          Copy-Item dist/SalesChannelChecker.exe pkg/
           Copy-Item docs/사용법.txt pkg/
-          Compress-Archive -Path pkg/* -DestinationPath MusinsaChecker-windows.zip -Force
+          Compress-Archive -Path pkg/* -DestinationPath SalesChannelChecker-windows.zip -Force
 
       - uses: actions/upload-artifact@v4
         with:
-          name: MusinsaChecker-windows
-          path: MusinsaChecker-windows.zip
+          name: SalesChannelChecker-windows
+          path: SalesChannelChecker-windows.zip
           retention-days: 30
 
       - name: Attach to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: MusinsaChecker-windows.zip
+          files: SalesChannelChecker-windows.zip

@@ -1,4 +1,4 @@
-# MUSINSA Unlisted Product Check
+# Sales Channel Checker (판매채널 상품 점검)
 
 무신사·29CM **판매중** 상품 중에서 고객에게 제대로 보이지 않는 상품을 찾는 도구입니다.
 화면 맨 위 [판매채널]에서 **무신사** 또는 **29CM**를 고릅니다. 29CM는 아래 [29CM](#29cm) 참고.
@@ -15,8 +15,8 @@
 
 ## 바로 쓰기 (Windows exe)
 
-1. GitHub → **Actions** → `Build Windows exe` → 최신 실행 → 하단 **Artifacts**의 `MusinsaChecker-windows` 다운로드 (또는 Releases의 zip)
-2. 압축을 풀고 `MusinsaChecker.exe` 실행
+1. GitHub → **Actions** → `Build Windows exe` → 최신 실행 → 하단 **Artifacts**의 `SalesChannelChecker-windows` 다운로드 (또는 Releases의 zip)
+2. 압축을 풀고 `SalesChannelChecker.exe` 실행
 3. 재고 관리(v2) 복사본과 셀메이트 재고목록을 고르고 **[▶ 점검 시작]**
    - 옵션 재고 점검 엑셀이 먼저 만들어지고(1분), 크롬이 열려 판매중 상품을 하나씩 검색합니다 (상품 1,000개 기준 40~60분)
    - 중간에 [■ 중지] → 나중에 [검색만 이어서 하기]
@@ -117,7 +117,7 @@
 ├─ search/
 │  └─ musinsa_brand_search.js# (예비) 크롬 콘솔용 검색 스크립트
 ├─ config.py                 # 브랜드명·제외 규칙·수동 연결 (settings.json으로 덮어씀)
-├─ musinsa_checker.spec      # PyInstaller 설정
+├─ sales_channel_checker.spec      # PyInstaller 설정
 ├─ .github/workflows/build-exe.yml  # Windows exe 자동 빌드 + 가짜 데이터로 자체 점검
 └─ tests/
    ├─ make_fixture.py        # 시험용 가짜 입력 파일 생성
@@ -129,7 +129,7 @@
 
 ### exe 빌드
 
-`main`에 `app/`, `src/`, `search/`, `tests/`, `config.py`, `musinsa_checker.spec`이 바뀌어 push되면 GitHub Actions가 Windows에서 PyInstaller로 빌드하고, 가짜 데이터와 가짜 무신사 검색 화면으로 exe 자체 점검(`--selftest`, 크롬 자동 검색 포함)을 돌린 뒤 zip을 올립니다. 직접 빌드하려면 Windows에서 `pip install -r requirements.txt pyinstaller` 후 `pyinstaller musinsa_checker.spec`.
+`main`에 `app/`, `src/`, `search/`, `tests/`, `config.py`, `sales_channel_checker.spec`이 바뀌어 push되면 GitHub Actions가 Windows에서 PyInstaller로 빌드하고, 가짜 데이터와 가짜 무신사 검색 화면으로 exe 자체 점검(`--selftest`, 크롬 자동 검색 포함)을 돌린 뒤 zip을 올립니다. 직접 빌드하려면 Windows에서 `pip install -r requirements.txt pyinstaller` 후 `pyinstaller sales_channel_checker.spec`.
 
 ---
 

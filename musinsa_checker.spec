@@ -8,7 +8,7 @@ a = Analysis(
     ['app/gui.py'],
     pathex=[ROOT, os.path.join(ROOT, 'app'), os.path.join(ROOT, 'src')],
     datas=[('src', 'src'), ('search', 'search')],
-    hiddenimports=['config', 'runner', 'search_check', 'openpyxl', 'openpyxl.workbook.properties', 'pandas', 'numpy', 'difflib', 'urllib.parse'],
+    hiddenimports=['config', 'runner', 'search_check', 'ui_search', 'websocket', 'openpyxl', 'openpyxl.workbook.properties', 'pandas', 'numpy', 'difflib', 'urllib.parse'],
     excludes=['matplotlib', 'scipy', 'IPython', 'pytest', 'PyQt5', 'PySide2'],
     cipher=block_cipher,
 )

@@ -216,6 +216,9 @@ def _sheet(wb, name, df, cols, heads, widths, desc, freeze='D3'):
             x = ws.cell(i, j, v); x.font = Font(name=F, size=10)
             if isinstance(v, str) and v.startswith('https://'):
                 x.hyperlink = v; x.font = Font(name=F, size=10, color='0563C1', underline='single')
+            elif isinstance(v, str) and cols[j - 1] == '캡처':
+                x.value = '캡처 보기'; x.hyperlink = v.replace(os.sep, '/')
+                x.font = Font(name=F, size=10, color='0563C1', underline='single')
             if isinstance(v, int): x.number_format = '#,##0'
             if j == 1:
                 x.fill = PatternFill('solid', fgColor=FILL.get(v, 'C6EFCE'))
@@ -242,23 +245,25 @@ def write_report(L, sr, brand, out_path, source_name='', excluded=0):
     R['비고'] = R.apply(_note, axis=1)
     R['검색링크'] = 'https://www.musinsa.com/search/goods?keyword=' + R['검색어(브랜드 포함)'].map(lambda v: quote(str(v)))
     R['상품링크'] = 'https://www.musinsa.com/products/' + R['상품번호'].astype(str)
+    if '캡처' not in R.columns:
+        R['캡처'] = None
     R['_k'] = R['검색여부'].map(lambda v: 0 if v == '검색 안 됨' else (1 if v == '미확인' else 2))
     R = R.sort_values(['_k', '총합판매가능'], ascending=[True, False])
 
     cols = ['검색여부', '상품번호', '상품명', '스타일넘버', '검색어(브랜드 포함)', '검색결과수', '브랜드결과수', '순위', '비고',
-            '옵션수', '판매가능옵션수', '총합판매가능', '브랜드배송', 'MFS', '검색링크', '상품링크']
+            '캡처', '옵션수', '판매가능옵션수', '총합판매가능', '브랜드배송', 'MFS', '검색링크', '상품링크']
     heads = ['검색 결과', '무신사 상품번호', '무신사 상품명', '스타일넘버', '검색어 (브랜드명 + 상품명, 컬러·COL 제외)', '검색 결과 수',
-             f'화면에 보인 {brand} 상품 수', '해당 상품 화면 순위', '비고', '옵션 수', '판매가능 옵션 수', '총합 판매가능 재고',
+             f'화면에 보인 {brand} 상품 수', '해당 상품 화면 순위', '비고', '검색 화면 캡처 (미노출_캡처 폴더)', '옵션 수', '판매가능 옵션 수', '총합 판매가능 재고',
              '브랜드배송 재고', '무신사배송(MFS) 재고', '무신사 검색 링크', '무신사 상품 링크']
-    widths = [24, 11, 40, 14, 40, 9, 11, 9, 50, 7, 9, 10, 10, 10, 38, 36]
+    widths = [24, 11, 40, 14, 40, 9, 11, 9, 50, 12, 7, 9, 10, 10, 10, 38, 36]
 
     wb = Workbook(); ws = wb.active; ws.title = '요약'
     miss = R[R['검색여부'] == '검색 안 됨']
     _sheet(wb, '검색_미노출', miss, cols, heads, widths,
            f'[왜 만들었나] 무신사 판매중 상품인데, 무신사 검색창에 "{brand} + 상품명"을 넣었을 때 검색 결과 화면에 나오지 않는 상품만 모은 시트입니다. '
-           f'실제 작업은 이 시트부터 보시면 됩니다.\n[읽는 법] 비고에 원인(유니섹스 검색 문제, 전 옵션 품절 등)을 적었습니다. 링크를 눌러 무신사 화면에서 직접 확인할 수 있습니다.')
+           f'실제 작업은 이 시트부터 보시면 됩니다.\n[읽는 법] 비고에 원인(유니섹스 검색 문제, 전 옵션 품절 등)을 적었습니다. 링크를 눌러 무신사 화면에서 직접 확인할 수 있고, "캡처 보기"를 누르면 검색했을 때의 화면 캡처가 열립니다 (엑셀 파일과 미노출_캡처 폴더가 같은 폴더에 있어야 함).')
     _sheet(wb, '전체_검색결과', R, cols, heads, widths,
-           f'[왜 만들었나] 옵션 재고 점검에서 조치가 필요하다고 나온 상품(상품별_한눈에보기)의 검색 결과입니다. 검색이 안 된 상품이 맨 위에 옵니다.\n'
+           f'[왜 만들었나] 판매중 상품 전체의 검색 결과입니다. 검색이 안 된 상품이 맨 위에 옵니다.\n'
            f'[읽는 법] 검색어는 상품명에서 컬러명·"_3COL" 같은 컬러 묶음 표시를 뗀 이름 앞에 "{brand}"를 붙인 것입니다. '
            f'"검색됨"은 실제 검색 결과 화면에 해당 상품번호가 브랜드 "{brand}"로 나왔다는 뜻입니다. "미확인"은 아직 브라우저 검색을 하지 않은 상품입니다.')
     b = Font(name=F, bold=True, size=10)

@@ -116,30 +116,53 @@ def prepare(stock_copy_path, sellmate_path, out_dir, log=_console):
     _run_steps(OPTION_STEPS, log)
     log(f'      → {os.path.basename(P["option_report"])}')
 
-    # 검색 대상: 옵션 재고 점검에서 조치가 필요하다고 나온 상품(상품별_한눈에보기)만
-    hv = pandas.read_excel(P['option_report'], '상품별_한눈에보기', header=1, dtype=str)
-    targets = set(hv.iloc[:, 1].dropna().astype(str))
-    L = L[L['상품번호'].astype(str).isin(targets)].reset_index(drop=True)
-    L.to_pickle(P['listings'])
-    log(f'3/4 브라우저 검색 스크립트 만드는 중 (상품별_한눈에보기 상품 {len(L):,}개) ...')
-    sc.write_search_script(L, cfg.BRAND_KR, SCRIPT_TEMPLATE, P['script'])
+    # 이전 검색 진행 기록·캡처 초기화 (새 파일로 다시 점검)
+    for p in (os.path.join(cfg.WORK, 'ui_progress.json'),):
+        if os.path.exists(p):
+            os.remove(p)
+    cap = os.path.join(out_dir, '미노출_캡처')
+    if os.path.isdir(cap):
+        import shutil; shutil.rmtree(cap, ignore_errors=True)
+    log(f'3/4 검색 목록 만드는 중 (판매중 상품 {len(L):,}개, 검색어 {L["검색어"].nunique():,}개) ...')
+    sc.write_search_script(L, cfg.BRAND_KR, SCRIPT_TEMPLATE, P['script'])   # 예비(수동) 콘솔 방식용
     log('4/4 검색 노출 엑셀(검색 전) 만드는 중 ...')
     sc.write_report(L, None, cfg.BRAND_KR, P['report'], meta['source'], excluded)
-    mins = max(1, round(len(L) * 0.55 / 60))
-    log(f'준비 완료. 옵션 재고 점검 엑셀은 이미 만들어졌습니다.')
-    log(f'이제 ② 무신사 검색을 실행하세요 (상품 {len(L):,}개, 약 {mins}분).')
+    log(f'옵션 재고 점검 완료 → {os.path.basename(P["option_report"])}')
     return P
 
 
-def apply_search(search_text, out_dir, log=_console):
+def auto_search(out_dir, log=_console, stop=None, progress=None, chrome_path=None, headless=False, base=None):
+    """크롬을 띄워 무신사 검색창에 직접 검색 → 결과 엑셀 완성 (중간에 멈추면 다음에 이어서)"""
+    import ui_search
+    P = _paths(out_dir)
+    if not os.path.exists(P['listings']):
+        raise FileNotFoundError('먼저 옵션 재고 점검(①)을 실행해 주세요.')
+    L = pandas.read_pickle(P['listings'])
+    with open(P['meta'], encoding='utf-8') as f:
+        meta = json.load(f)
+    log('무신사 자동 검색: 크롬을 띄웁니다. 검색이 끝날 때까지 그 크롬 창은 건드리지 말아 주세요 (최소화는 괜찮습니다).')
+    kw = dict(log=log, stop=stop, progress=progress, chrome_path=chrome_path, headless=headless)
+    if base:
+        kw['base'] = base
+    text, caps = ui_search.run(L, meta['brand'], out_dir, **kw)
+    if not text:
+        log('검색한 상품이 없습니다.'); return None
+    n_cap = len(caps)
+    if n_cap:
+        log(f'검색 안 된 상품 화면 캡처 {n_cap:,}개 → {os.path.join(out_dir, "미노출_캡처")}')
+    return apply_search(text, out_dir, log, caps)
+
+
+def apply_search(search_text, out_dir, log=_console, caps=None):
     P = _paths(out_dir)
     if not os.path.exists(P['listings']):
         raise FileNotFoundError('먼저 [① 옵션 재고 점검 + 검색 준비]를 실행해 주세요.')
-    import pandas as pd
-    L = pd.read_pickle(P['listings'])
+    L = pandas.read_pickle(P['listings'])
     with open(P['meta'], encoding='utf-8') as f:
         meta = json.load(f)
     sr = sc.parse_search_result(search_text)
+    if caps:
+        sr['캡처'] = pandas.Series(caps)
     with open(P['search'], 'w', encoding='utf-8') as f:
         f.write(search_text.strip())
     R = sc.write_report(L, sr, meta['brand'], P['report'], meta['source'], meta['excluded'])
@@ -156,7 +179,7 @@ def apply_search(search_text, out_dir, log=_console):
 
 
 def main():
-    """명령줄: python app/runner.py <재고관리_복사본.xlsx> <셀메이트_재고목록.csv> [결과폴더] [검색결과.txt]"""
+    """명령줄: python app/runner.py <재고관리_복사본.xlsx> <셀메이트_재고목록.csv> [결과폴더] [검색결과.txt | --auto]"""
     a = sys.argv[1:]
     if len(a) < 2:
         print(main.__doc__); sys.exit(1)
@@ -164,7 +187,9 @@ def main():
     try:
         P = prepare(os.path.abspath(a[0]), os.path.abspath(a[1]), out)
         print(' → 옵션 재고 점검:', P['option_report'])
-        if len(a) > 3:
+        if len(a) > 3 and a[3] == '--auto':
+            auto_search(out)
+        elif len(a) > 3:
             with open(a[3], encoding='utf-8') as f:
                 apply_search(f.read(), out)
         else:

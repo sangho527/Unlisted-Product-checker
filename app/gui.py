@@ -37,6 +37,7 @@ class App(tk.Tk):
         self.option_add('*Font', FONT)
         self.q = queue.Queue()
         self.busy = False
+        self.stop_ev = threading.Event()
         self.in_var = tk.StringVar()
         self.sm_var = tk.StringVar()
         self.out_var = tk.StringVar(value=os.path.join(cfg.ROOT, '결과'))
@@ -75,25 +76,29 @@ class App(tk.Tk):
         ttk.Button(ob, text='폴더 열기', command=self.open_out).pack(side='left', padx=8)
 
         sb = ttk.LabelFrame(self, text=' 4. 점검 '); sb.pack(fill='x', **pad)
-        self.btn1 = ttk.Button(sb, text='① 옵션 재고 점검 + 검색 준비', command=self.prepare)
-        self.btn1.grid(row=0, column=0, padx=8, pady=6, sticky='ew', ipady=3)
-        ttk.Label(sb, foreground='#444', justify='left', wraplength=470, text='셀메이트 재고 ↔ 무신사 옵션을 대조해 옵션 재고 점검 엑셀을 만들고,\n그중 조치가 필요한 상품(상품별_한눈에보기)만 검색어(컬러·COL 표기 제외)를 만듭니다.').grid(row=0, column=1, sticky='w')
-        self.btn2 = ttk.Button(sb, text='② 검색 스크립트 복사 + 무신사 열기', command=self.copy_search)
-        self.btn2.grid(row=1, column=0, padx=8, pady=6, sticky='ew', ipady=3)
-        ttk.Label(sb, foreground='#444', justify='left', wraplength=470, text=(
-            '열린 무신사 페이지(크롬)에서 F12 → Console 탭 → Ctrl+V → Enter\n'
-            '(처음이면 "allow pasting" 입력 후 Enter, 다시 Ctrl+V). 끝나면 "완료"가 뜨고 결과가 자동 복사됩니다.')).grid(row=1, column=1, sticky='w')
-        self.btn3 = ttk.Button(sb, text='③ 검색 결과 붙여넣기 → 엑셀 완성', command=self.paste_search)
-        self.btn3.grid(row=2, column=0, padx=8, pady=6, sticky='ew', ipady=3)
-        ttk.Label(sb, foreground='#444', justify='left', wraplength=470, text='콘솔에 "완료"가 나온 뒤 누르세요. 두 결과 엑셀에 검색 결과가 반영됩니다.').grid(row=2, column=1, sticky='w')
-        self.pb = ttk.Progressbar(sb, mode='indeterminate', length=160)
-        self.pb.grid(row=3, column=0, columnspan=2, sticky='ew', padx=8, pady=(0, 6))
-        sb.columnconfigure(1, weight=1)
+        self.btn1 = ttk.Button(sb, text='▶ 점검 시작', command=self.start_all)
+        self.btn1.grid(row=0, column=0, padx=8, pady=6, sticky='ew', ipady=6)
+        ttk.Label(sb, foreground='#444', justify='left', wraplength=520, text=(
+            '① 셀메이트 재고 ↔ 무신사 옵션 대조 → 무신사_옵션재고점검 엑셀\n'
+            '② 크롬을 띄워 무신사 검색창에 판매중 상품을 하나씩 검색 → 무신사_검색노출점검 엑셀 + 미노출 화면 캡처\n'
+            '   (상품 1,000개 기준 40~60분. 검색하는 크롬 창은 건드리지 마세요. 최소화는 괜찮습니다)')).grid(row=0, column=1, columnspan=2, sticky='w')
+        self.btn_stop = ttk.Button(sb, text='■ 중지', command=self.stop_search, state='disabled')
+        self.btn_stop.grid(row=1, column=0, padx=8, pady=(0, 6), sticky='ew')
+        self.btn2 = ttk.Button(sb, text='검색만 이어서 하기', command=self.resume_search)
+        self.btn2.grid(row=1, column=1, padx=(0, 8), pady=(0, 6), sticky='w')
+        ttk.Label(sb, foreground='#777', text='중지했거나 창을 닫았을 때, 했던 곳 다음부터 검색합니다.').grid(row=1, column=2, sticky='w')
+        self.pb = ttk.Progressbar(sb, mode='determinate', length=160)
+        self.pb.grid(row=2, column=0, columnspan=3, sticky='ew', padx=8, pady=(0, 6))
+        mf = ttk.Frame(sb); mf.grid(row=3, column=0, columnspan=3, sticky='w', padx=8, pady=(0, 6))
+        ttk.Label(mf, foreground='#777', text='예비(자동 검색이 안 될 때): ').pack(side='left')
+        self.btn3 = ttk.Button(mf, text='콘솔 스크립트 복사 + 무신사 열기', command=self.copy_search); self.btn3.pack(side='left', padx=4)
+        self.btn4 = ttk.Button(mf, text='콘솔 결과 붙여넣기', command=self.paste_search); self.btn4.pack(side='left', padx=4)
+        sb.columnconfigure(2, weight=1)
 
         lb = ttk.LabelFrame(self, text=' 진행 상황 '); lb.pack(fill='both', expand=True, **pad)
         self.log_box = ScrolledText(lb, height=10, font=('Consolas', 9), state='disabled')
         self.log_box.pack(fill='both', expand=True, padx=6, pady=6)
-        self.log('재고 관리(v2) 복사본과 셀메이트 재고목록을 고르고 ① → ② → ③ 순서로 누르세요.')
+        self.log('재고 관리(v2) 복사본과 셀메이트 재고목록을 고르고 [▶ 점검 시작]을 누르세요.')
 
     # ---------- 동작 ----------
     def pick_in(self):
@@ -130,6 +135,9 @@ class App(tk.Tk):
                 kind, payload = self.q.get_nowait()
                 if kind == 'log':
                     self.log(payload)
+                elif kind == 'prog':
+                    i, n = payload
+                    self.pb.configure(mode='determinate', maximum=max(n, 1), value=i)
                 elif kind == 'done':
                     self._finish(True, payload)
                 elif kind == 'error':
@@ -140,9 +148,13 @@ class App(tk.Tk):
 
     def _set_busy(self, busy):
         self.busy = busy
-        for b in (self.btn1, self.btn2, self.btn3):
+        for b in (self.btn1, self.btn2, self.btn3, self.btn4):
             b.configure(state='disabled' if busy else 'normal')
-        (self.pb.start(12) if busy else self.pb.stop())
+        self.btn_stop.configure(state='normal' if busy else 'disabled')
+        if not busy:
+            self.pb.stop(); self.pb.configure(mode='determinate', value=0)
+        else:
+            self.pb.configure(mode='indeterminate'); self.pb.start(12)
 
     def _work(self, fn, on_done):
         self._on_done = on_done
@@ -170,7 +182,24 @@ class App(tk.Tk):
         os.makedirs(out, exist_ok=True)
         return out
 
-    def prepare(self):
+    def _search_fn(self, out):
+        self.stop_ev.clear()
+        def prog(i, n):
+            if i == 1:
+                self.q.put(('log', ''))
+            self.q.put(('prog', (i, n)))
+        return lambda log: runner.auto_search(out, log=log, stop=self.stop_ev, progress=prog)
+
+    def _done_search(self, report):
+        if not report:
+            return
+        msg = '점검을 마쳤습니다.\n\n· 무신사_검색노출점검 → "검색_미노출" 시트\n· 무신사_옵션재고점검 → "상품별_한눈에보기" 시트\n· 미노출_캡처 폴더: 검색 안 된 상품의 검색 화면\n\n결과 폴더를 열까요?'
+        if self.stop_ev.is_set():
+            msg = '검색을 중지했습니다. 지금까지 검색한 결과로 엑셀을 만들었습니다 (나머지는 "미확인").\n[검색만 이어서 하기]로 계속할 수 있습니다.\n\n결과 폴더를 열까요?'
+        if messagebox.askyesno(APP_TITLE, msg):
+            open_path(os.path.dirname(report))
+
+    def start_all(self):
         if self.busy:
             return
         out = self._out()
@@ -180,16 +209,29 @@ class App(tk.Tk):
         smf = self.sm_var.get().strip()
         self._save_last()
         self.log('')
-        def done(P):
-            if messagebox.askyesno(APP_TITLE, '옵션 재고 점검 엑셀을 만들었습니다. 열어볼까요?\n\n'
-                                   '(검색 노출은 ② 버튼으로 무신사 검색을 실행한 뒤 ③에서 반영됩니다)'):
-                open_path(P['option_report'])
-        self._work(lambda log: runner.prepare(src, smf, out, log=log), done)
+        search = self._search_fn(out)
+        def both(log):
+            runner.prepare(src, smf, out, log=log)
+            return search(log)
+        self._work(both, self._done_search)
+
+    def resume_search(self):
+        if self.busy:
+            return
+        out = self._out()
+        if not out:
+            return
+        self.log('')
+        self._work(self._search_fn(out), self._done_search)
+
+    def stop_search(self):
+        self.stop_ev.set()
+        self.log('중지 요청 — 지금 검색 중인 상품까지 하고 멈춥니다 ...')
 
     def copy_search(self):
         js = os.path.join(self.out_var.get(), 'musinsa_brand_search_ready.js')
         if not os.path.exists(js):
-            messagebox.showinfo(APP_TITLE, '먼저 ① 옵션 재고 점검 + 검색 준비를 실행해 주세요.'); return
+            messagebox.showinfo(APP_TITLE, '먼저 [▶ 점검 시작]을 한 번 실행해 주세요 (옵션 재고 점검까지 끝나면 중지해도 됩니다).'); return
         with open(js, encoding='utf-8') as f:
             text = f.read()
         self.clipboard_clear(); self.clipboard_append(text); self.update()
@@ -219,7 +261,7 @@ class App(tk.Tk):
         messagebox.showinfo(APP_TITLE, '설정 파일(settings.json)을 엽니다.\n\n'
                             'BRAND_KR: 무신사에 표시되는 브랜드명 (검색어 앞에 붙고, 검색 결과의 브랜드를 이 이름으로 확인)\n'
                             'EXCLUDE_CODE_PATTERN: 점검에서 뺄 스타일넘버 규칙 (예: ^(ZD|VV) = ZD·VV로 시작하는 상품 제외)\n\n'
-                            '저장한 뒤 ① 옵션 재고 점검 + 검색 준비부터 다시 실행하면 반영됩니다.')
+                            '저장한 뒤 [▶ 점검 시작]부터 다시 실행하면 반영됩니다.')
         open_path(cfg.SETTINGS_FILE)
 
     def show_help(self):
@@ -229,13 +271,15 @@ class App(tk.Tk):
             ' · 무신사에서 상품명으로 검색했을 때 안 나오는 것\n'
             '을 찾습니다.\n\n'
             '1) 재고 관리(v2) 표를 복사해 엑셀로 저장한 파일과 셀메이트 재고목록(CSV)을 고릅니다.\n'
-            '2) ① 옵션 재고 점검 + 검색 준비 → 무신사_옵션재고점검 엑셀 생성\n'
-            '3) ② 검색 스크립트 복사 + 무신사 열기 → 크롬 F12 → Console → Ctrl+V → Enter\n'
-            '   (상품별_한눈에보기 상품만 검색, 300개 기준 약 3분. 그동안 그 탭을 닫지 마세요)\n'
-            '4) 콘솔에 "완료"가 나오면 ③ 검색 결과 붙여넣기\n'
-            '5) 무신사_옵션재고점검 → "상품별_한눈에보기", 무신사_검색노출점검 → "검색_미노출" 시트 확인\n\n'
-            '검색은 "브랜드명 + 상품명(컬러·_3COL 표기 제외)"으로 하고,\n'
-            '검색 결과 화면에 그 상품이 우리 브랜드로 나오는지 확인합니다.'))
+            '2) [▶ 점검 시작]\n'
+            '   · 옵션 재고 점검 엑셀이 먼저 만들어지고\n'
+            '   · 크롬이 열려 무신사 검색창에 "브랜드명 + 상품명(컬러·_3COL 표기 제외)"을 하나씩 입력해 검색합니다.\n'
+            '   · 검색 결과 화면에 그 상품이 우리 브랜드로 안 보이면 화면을 캡처해 "미노출_캡처" 폴더에 저장합니다.\n'
+            '   · 검색하는 크롬 창은 건드리지 마세요 (최소화는 괜찮습니다). 중간에 멈추면 [검색만 이어서 하기].\n'
+            '3) 결과 폴더\n'
+            '   · 무신사_검색노출점검 → "검색_미노출" 시트 ("캡처 보기"로 화면 확인)\n'
+            '   · 무신사_옵션재고점검 → "상품별_한눈에보기" 시트\n\n'
+            '자동 검색이 안 되면 아래 "예비" 버튼으로 크롬 콘솔(F12)에서 검색할 수 있습니다.'))
 
     def _load_last(self):
         try:
@@ -255,8 +299,8 @@ class App(tk.Tk):
             pass
 
 
-def selftest(fixture_dir, out_dir):
-    """화면 없이 실행 (빌드 확인용): MusinsaChecker.exe --selftest <입력폴더> <결과폴더>"""
+def selftest(fixture_dir, out_dir, auto_base=None):
+    """화면 없이 실행 (빌드 확인용): MusinsaChecker.exe --selftest <입력폴더> <결과폴더> [가짜 무신사 주소]"""
     os.makedirs(out_dir, exist_ok=True)
     logf = open(os.path.join(out_dir, 'selftest.log'), 'w', encoding='utf-8')
     log = lambda m: (logf.write(m + '\n'), logf.flush())
@@ -268,6 +312,14 @@ def selftest(fixture_dir, out_dir):
             with open(os.path.join(fixture_dir, 'search_result.txt'), encoding='utf-8') as f:
                 report = runner.apply_search(f.read(), out, log=log)
             ok = ok and os.path.exists(report) and os.path.exists(P['script']) and os.path.exists(P['option_report'])
+            if ok and auto_base:   # 크롬 자동 검색 (가짜 무신사 페이지)
+                report = runner.auto_search(out, log=log, headless=True, base=auto_base)
+                import pandas as _pd
+                R = _pd.read_excel(report, '전체_검색결과', header=1, dtype=str)
+                st = dict(zip(R.iloc[:, 1], R.iloc[:, 0]))
+                log(f'자동 검색 결과: {st}')
+                ok = st.get('9000001', '').startswith('검색됨') and st.get('9000002') == '검색 안 됨' \
+                    and os.path.exists(os.path.join(out, '미노출_캡처'))
             if ok:   # 셀메이트 재고 5인데 무신사 품절인 9000001 BLACK^M 이 잡혀야 함
                 import pandas as pd
                 hv = pd.read_excel(P['option_report'], '상품별_한눈에보기', header=1, dtype=str)
@@ -285,5 +337,5 @@ def selftest(fixture_dir, out_dir):
 
 if __name__ == '__main__':
     if len(sys.argv) >= 4 and sys.argv[1] == '--selftest':
-        sys.exit(selftest(sys.argv[2], sys.argv[3]))
+        sys.exit(selftest(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None))
     App().mainloop()
